@@ -2,11 +2,14 @@
 import { app, safeStorage } from "electron";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
-import type { Settings, BoostSettings, FanSettings, RgbSettings, GameProfile } from "../shared/types";
+import type { Settings, BoostSettings, FanSettings, RgbSettings, GameProfile, ExtrasSettings } from "../shared/types";
+import { randomBytes } from "node:crypto";
 
 interface Stored {
   apiKeyEnc: string | null;
   model: string;
+  aiProvider: "claude" | "local";
+  localModel: string;
   startWithWindows: boolean;
   presentMonPath: string;
   boost: BoostSettings;
@@ -16,11 +19,15 @@ interface Stored {
   fans: FanSettings;
   rgb: RgbSettings;
   profiles: Record<string, GameProfile>; // key = exe name, lower case
+  extras: ExtrasSettings;
+  lastGpuDriver: string | null;
 }
 
 const defaults: Stored = {
   apiKeyEnc: null,
   model: "claude-sonnet-5-5",
+  aiProvider: "claude",
+  localModel: "",
   startWithWindows: false,
   presentMonPath: "",
   driverCheckHours: 24,
@@ -39,6 +46,25 @@ const defaults: Stored = {
     openRgbPath: "",
   },
   profiles: {},
+  lastGpuDriver: null,
+  extras: {
+    holdWindowsUpdate: true,
+    autoClearShaders: true,
+    snapshots: false,
+    energyRate: 0.13,
+    baselineWatts: 60,
+    voice: { enabled: false, hotkey: "CommandOrControl+Shift+Space", speak: true },
+    remote: { enabled: false, port: 7342, token: "", allowControl: false },
+    discord: { enabled: false, appId: "" },
+    gameLighting: true,
+    checkup: { enabled: true, hour: 10 },
+    anomalyAlerts: true,
+    autopilot: false,
+    rigLayout: {},
+    security: { watch: true, alertNewDevices: true, alertNewListeners: true },
+    playstyle: "",
+    aim: { dpi: 800, scores: [] },
+  },
   boost: {
     enabled: true,
     raisePriority: true,
@@ -70,12 +96,15 @@ export function load(): Stored {
         fans: { ...defaults.fans, ...(raw.fans ?? {}) },
         rgb: { ...defaults.rgb, ...(raw.rgb ?? {}), schedule: { ...defaults.rgb.schedule, ...(raw.rgb?.schedule ?? {}) } },
         profiles: raw.profiles ?? {},
+        extras: { ...defaults.extras, ...(raw.extras ?? {}) },
       };
     }
   } catch {
     /* fall through to defaults */
   }
   cache ??= structuredClone(defaults);
+  // The phone remote needs a random secret; make one the first time.
+  if (!cache!.extras.remote.token) cache!.extras.remote.token = randomBytes(18).toString("base64url");
   return cache!;
 }
 
@@ -87,6 +116,7 @@ export function save(patch: Partial<Stored>): Stored {
     boost: { ...cur.boost, ...(patch.boost ?? {}) },
     fans: { ...cur.fans, ...(patch.fans ?? {}) },
     rgb: { ...cur.rgb, ...(patch.rgb ?? {}) },
+    extras: { ...cur.extras, ...(patch.extras ?? {}) },
   };
   mkdirSync(dir(), { recursive: true });
   writeFileSync(file(), JSON.stringify(cache, null, 2));
@@ -98,6 +128,9 @@ export function publicSettings(): Settings {
   return {
     model: s.model,
     hasApiKey: !!s.apiKeyEnc,
+    aiProvider: s.aiProvider,
+    localModel: s.localModel,
+    aiReady: s.aiProvider === "local" ? !!s.localModel : !!s.apiKeyEnc,
     startWithWindows: s.startWithWindows,
     presentMonPath: s.presentMonPath,
     boost: s.boost,
@@ -130,3 +163,9 @@ export const dataDir = (sub: string) => {
   mkdirSync(p, { recursive: true });
   return p;
 };
+
+/** Is the chosen AI engine (Claude or Rigmind Local AI) set up? */
+export function aiReady(): boolean {
+  const s = load();
+  return s.aiProvider === "local" ? !!s.localModel : !!s.apiKeyEnc;
+}

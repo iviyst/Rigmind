@@ -8,18 +8,32 @@ import { Assistant } from "./pages/Assistant";
 import { SettingsPage } from "./pages/SettingsPage";
 import { Cooling } from "./pages/Cooling";
 import { Lighting } from "./pages/Lighting";
+import { Health } from "./pages/Health";
+import { Security } from "./pages/Security";
+import { Tune } from "./pages/Tune";
+import { Coach } from "./pages/Coach";
+import { Automations } from "./pages/Automations";
 import { Toaster } from "./components/Bits";
-import { BrandMark, IconAssistant, IconBoost, IconDrivers, IconLive, IconSessions, IconSettings, IconFan, IconLight } from "./components/Icons";
+import { BrandMark, IconAssistant, IconBoost, IconDrivers, IconLive, IconSessions, IconSettings, IconFan, IconLight, IconHealth, IconShield, IconTune, IconCoach, IconAuto } from "./components/Icons";
 import type { ChatMessage, GameState, Settings, Telemetry } from "../shared/types";
 
-type Page = "live" | "boost" | "sessions" | "cooling" | "lighting" | "drivers" | "assistant" | "settings";
-const NAV: { id: Page; label: string; icon: () => JSX.Element }[] = [
+type Page = "live" | "boost" | "coach" | "sessions" | "health" | "security" | "tune" | "cooling" | "lighting" | "drivers" | "automations" | "assistant" | "settings";
+// Groups are separated by a thin line in the sidebar.
+const NAV: ({ id: Page; label: string; icon: () => JSX.Element } | "sep")[] = [
   { id: "live", label: "Live", icon: IconLive },
   { id: "boost", label: "Game Boost", icon: IconBoost },
+  { id: "coach", label: "Game Coach", icon: IconCoach },
   { id: "sessions", label: "Sessions", icon: IconSessions },
+  "sep",
+  { id: "health", label: "Health", icon: IconHealth },
+  { id: "security", label: "Security", icon: IconShield },
+  { id: "tune", label: "Tune", icon: IconTune },
+  { id: "drivers", label: "Drivers", icon: IconDrivers },
+  "sep",
   { id: "cooling", label: "Cooling", icon: IconFan },
   { id: "lighting", label: "Lighting", icon: IconLight },
-  { id: "drivers", label: "Drivers", icon: IconDrivers },
+  "sep",
+  { id: "automations", label: "Automations", icon: IconAuto },
   { id: "assistant", label: "Assistant", icon: IconAssistant },
   { id: "settings", label: "Settings", icon: IconSettings },
 ];
@@ -61,18 +75,27 @@ export function App() {
         </span>
       </header>
       <nav className="rail" aria-label="Main">
-        {NAV.map(({ id, label, icon: Icon }) => (
-          <button key={id} aria-current={page === id ? "page" : undefined} onClick={() => setPage(id)}>
-            <Icon />
-            {label}
-          </button>
-        ))}
+        {NAV.map((n, i) =>
+          n === "sep" ? (
+            <div key={`sep${i}`} className="sep" role="separator" />
+          ) : (
+            <button key={n.id} aria-current={page === n.id ? "page" : undefined} onClick={() => setPage(n.id)}>
+              <n.icon />
+              {n.label}
+            </button>
+          )
+        )}
         {isMock && <div className="foot">Preview with sample data. Run inside the app to see your PC.</div>}
       </nav>
       <main>
         {page === "live" && <Live history={history} game={game} onAsk={ask} />}
         {page === "boost" && <Boost settings={settings} setSettings={setSettings} game={game} />}
         {page === "sessions" && <Sessions settings={settings} onAsk={ask} />}
+        {page === "coach" && <Coach settings={settings} />}
+        {page === "health" && <Health settings={settings} />}
+        {page === "security" && <Security settings={settings} />}
+        {page === "tune" && <Tune />}
+        {page === "automations" && <Automations settings={settings} />}
         {page === "cooling" && <Cooling />}
         {page === "lighting" && <Lighting />}
         {page === "drivers" && <Drivers />}

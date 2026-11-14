@@ -3,7 +3,8 @@ import { EventEmitter } from "node:events";
 import { spawn, ChildProcessWithoutNullStreams } from "node:child_process";
 import { existsSync } from "node:fs";
 import { resource } from "./paths";
-import type { FanInfo, HwStatus, TempReading } from "../shared/types";
+import { randomUUID } from "node:crypto";
+import type { FanInfo, HwStatus, TempReading, DisplayInfo } from "../shared/types";
 
 interface RawSensor { id: string; name: string; type: string; index: number; min?: number; max?: number }
 interface RawHardware { id: string; name: string; type: string; parent?: string | null; sensors: RawSensor[] }
@@ -19,6 +20,7 @@ class HardwareHelper extends EventEmitter {
   private stopping = false;
   pawnio = false;
   error: string | null = null;
+  private pending = new Map<string, { resolve: (v: any) => void; timer: ReturnType<typeof setTimeout> }>();
 
   get running() {
     return !!this.proc && Date.now() - this.lastSample < 5000;
@@ -81,6 +83,46 @@ class HardwareHelper extends EventEmitter {
     if (this.proc?.stdin.writable) this.proc.stdin.write(JSON.stringify(cmd) + "\n");
   }
 
+  /** Send a command that answers with a message carrying the same id. Resolves null on timeout. */
+  request<T = any>(cmd: Record<string, unknown>, timeoutMs = 10_000): Promise<T | null> {
+    if (!this.proc) return Promise.resolve(null);
+    const id = randomUUID();
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        this.pending.delete(id);
+        resolve(null);
+      }, timeoutMs);
+      this.pending.set(id, { resolve, timer });
+      this.send({ ...cmd, id });
+    });
+  }
+
+  setPingTargets(targets: string[]) {
+    this.send({ cmd: "ping", targets });
+  }
+  snap(path: string, width = 480) {
+    return this.request<{ ok: boolean; path: string }>({ cmd: "snap", path, w: width }, 8000);
+  }
+  avgColor() {
+    return this.request<{ r: number; g: number; b: number }>({ cmd: "avgcolor" }, 2000);
+  }
+  displays() {
+    return this.request<{ list: DisplayInfo[] }>({ cmd: "displays" }, 8000).then((r) => r?.list ?? []);
+  }
+  setRefresh(device: string, hz: number) {
+    return this.request<{ ok: boolean; msg: string }>({ cmd: "setrefresh", device, hz }, 8000);
+  }
+  listen(seconds = 8) {
+    return this.request<{ text: string; error?: string }>({ cmd: "listen", seconds }, (seconds + 6) * 1000);
+  }
+  say(text: string) {
+    this.send({ cmd: "say", text });
+  }
+  cpuPower(): number | null {
+    const c = this.find((h, s) => h.type === "Cpu" && s.type === "Power" && /package/i.test(s.name));
+    return c.length ? c[0].v : null;
+  }
+
   setFan(controlId: string, pct: number) {
     this.send({ cmd: "set", id: controlId, value: Math.round(pct) });
   }
@@ -103,6 +145,15 @@ class HardwareHelper extends EventEmitter {
       this.emit("status", this.status());
     } else if (m.type === "error") {
       this.error = m.msg;
+    } else if (m.type === "ping") {
+      this.emit("ping", m.r as { host: string; ms: number | null }[]);
+    }
+    // Replies to request(): matched by id.
+    if (m.id && this.pending.has(m.id)) {
+      const p = this.pending.get(m.id)!;
+      clearTimeout(p.timer);
+      this.pending.delete(m.id);
+      p.resolve(m);
     }
   }
 

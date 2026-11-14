@@ -2,12 +2,22 @@ import { useEffect, useState } from "react";
 import { api, fmt, tempTone } from "../api";
 import { Gauge } from "../components/Gauge";
 import { Sparkline } from "../components/Charts";
-import type { GameState, ProcInfo, Telemetry } from "../../shared/types";
+import type { GameState, ProcInfo, Telemetry, NetStatus, EnergySummary } from "../../shared/types";
+import { RigCardButton } from "../components/RigCard";
 
 export function Live({ history, game, onAsk }: { history: Telemetry[]; game: GameState; onAsk: (q: string) => void }) {
   const t = history[history.length - 1];
   const [procs, setProcs] = useState<ProcInfo[]>([]);
   const [cpuName, setCpuName] = useState<string>();
+  const [net, setNet] = useState<NetStatus | null>(null);
+  const [energy, setEnergy] = useState<EnergySummary | null>(null);
+  useEffect(() => {
+    api.netStatus().then(setNet);
+    api.energySummary().then(setEnergy);
+    const off = api.onNet(setNet);
+    const id = setInterval(() => api.energySummary().then(setEnergy), 10_000);
+    return () => (off(), clearInterval(id));
+  }, []);
   useEffect(() => {
     api.getSystemInfo().then((s) => setCpuName(s.cpu)).catch(() => {});
   }, []);
@@ -29,9 +39,17 @@ export function Live({ history, game, onAsk }: { history: Telemetry[]; game: Gam
           <h1>{game.active ? game.game : "Your rig, live"}</h1>
           <p className="sub">{game.active ? `Playing for ${fmt.dur(Date.now() - (game.since ?? Date.now()))}${game.boosted ? " with Game Boost on" : ""}` : "Updated every second. Start a game and Game Boost takes over."}</p>
         </div>
+        <div className="row">
+        <RigCardButton cpuName={cpuName} />
         <button className="btn" onClick={() => onAsk(game.active ? `I'm playing ${game.game}. Look at my live stats and tell me what's limiting my FPS right now.` : "My PC feels slow. Check my live stats and tell me why.")}>
           Ask Rigmind what's slowing it down
         </button>
+        </div>
+      </div>
+
+      <div className="chips">
+        {net?.targets.map((t) => <span key={t.host}>{t.label}: <b>{t.ms ?? "–"} ms</b>{t.loss ? `, ${t.loss}% loss` : ""}</span>)}
+        {energy?.nowW != null && <span>Drawing <b>{energy.nowW} W</b>, about ${energy.today.cost.toFixed(2)} today</span>}
       </div>
 
       <section className="panel hero" aria-label="Load">

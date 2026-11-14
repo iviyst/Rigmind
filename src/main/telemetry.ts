@@ -182,7 +182,7 @@ class TelemetryService extends EventEmitter {
     if (t.cpu.temp == null && prev?.cpu.temp != null && this.cpuTempSensor) t.cpu.temp = prev.cpu.temp;
     if (gpu && gpu.temp == null && prev?.gpu?.temp != null && this.cpuTempSensor) gpu.temp = prev.gpu.temp;
     this.history.push(t);
-    if (this.history.length > 180) this.history.shift();
+    if (this.history.length > 300) this.history.shift();
     this.emit("sample", t);
   }
 }

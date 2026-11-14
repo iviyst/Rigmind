@@ -1,5 +1,4 @@
 # Rigmind
-<<<<<<< HEAD
 
 AI-powered performance companion for Windows gaming PCs. Live monitoring, automatic Game Boost, frame-time stutter analysis explained by Claude, before/after fix testing, fan and RGB control, and one-click driver updates.
 
@@ -14,10 +13,16 @@ The few times Rigmind connects to the internet, it talks directly to the service
 
 | When | Where it goes | What is sent |
 |---|---|---|
-| You use the Assistant or a session report | Anthropic's API, with **your own** key | The stats, hardware info, session data and driver status Claude needs to answer. Covered by [Anthropic's API data policy](https://www.anthropic.com/legal/privacy). If you don't add a key, nothing is ever sent. |
+| You use AI features with **Claude** | Anthropic's API, with **your own** key | The stats, hardware info, session, crash and security data Claude needs to answer. Covered by [Anthropic's API data policy](https://www.anthropic.com/legal/privacy). |
+| You use AI features with **Rigmind Local AI** | Nowhere. It runs on your PC through Ollama | Nothing leaves your PC. (The one-time model download comes from Ollama's library.) |
+| Find the latest BIOS (Claude only) | Anthropic's web search, reading the board maker's site | Your motherboard model and BIOS version. |
 | Driver checks | NVIDIA and Microsoft Windows Update | Standard driver lookups, the same ones the NVIDIA app and Windows Update do. |
 | Update checks | GitHub (this repository's Releases) | A request for the latest version number. |
 | Installing helpers you choose | winget / the tool's official site | Only when you click Install. |
+| Phone remote (off by default) | Your home network only | Live stats to your own phone, protected by a secret link. |
+| Discord status (off by default) | The Discord app on your PC | Your current game and FPS. |
+
+Security scans use Microsoft Defender on your PC; Rigmind never uploads your files.
 
 ## Features
 
@@ -30,7 +35,13 @@ The few times Rigmind connects to the internet, it talks directly to the service
 | **Cooling** | Fan curves (Quiet, Balanced, Performance or custom), separate curves for the desktop and for gaming, spin-up ahead of the heat when a game launches, per-fan calibration, and failsafes. |
 | **Lighting** | RGB through OpenRGB that shows your PC's status: blue at idle shifting toward magenta as temperatures rise. It pulses red if something runs hot, flashes for notifications, and can show a color per game, turn off on a schedule, or turn off when you're away. |
 | **Drivers** | NVIDIA driver one-click update; Windows Update drivers with a restore point; BIOS and SSD firmware checks. **Firmware is never flashed automatically.** |
-| **Assistant** | Chat with Claude about your PC. Fixes appear as **Apply** or **Apply and test** buttons, from a fixed list of safe actions. |
+| **Assistant** | Chat about your PC with Claude or the free Rigmind Local AI. Fixes appear as **Apply** or **Apply and test** buttons, from a fixed list of safe actions. Rig notes let it remember facts about your PC between chats. |
+| **Game Coach** | Optimizes any game's settings for your hardware and playstyle by reading its own config file. Sensitivity converter (cm/360, eDPI), aim warm-up trainer, and CS2/Dota 2 match recaps lined up with your FPS and ping. Fair play only: no aim assist. |
+| **Health** | Daily AI checkup. Crash Detective (crashes, GPU driver resets, hardware errors, blue screens, sudden shutdowns) with a flight recorder of the minutes before each one. Temperature trends, boot time and what slows it, driver impact on each game, a built-in CPU+GPU stress test, and an undervolting coach. |
+| **Security** | Microsoft Defender status, scans, threats and quarantine, explained in plain English. Intrusion watch: new apps accepting connections, new services, startup tasks and admin accounts, failed sign-ins, new devices on your network, and an exposure check (firewall, Remote Desktop, sharing, SMBv1). |
+| **Tune** | Display Doctor (monitors stuck at 60 Hz), ping/jitter/loss to your game's servers, power use and cost, shader cache cleanup, holding Windows Update during games, stutter snapshots. |
+| **Automations** | "When I start Valorant, close Chrome and set fans to performance." Plain English becomes a rule built from a fixed set of safe steps. |
+| **More** | Voice copilot (hotkey, offline speech recognition), phone remote, rig card image, Discord status, live rig diagram, game-reactive and screen-matching RGB, Autopilot for low-risk fixes, change history with undo, BIOS Update Assistant. |
 
 ## Set up (Windows 10/11)
 
@@ -40,7 +51,7 @@ The few times Rigmind connects to the internet, it talks directly to the service
 4. `npm run build:hw` builds the hardware helper (sensors and fan control).
 5. `npm run dev` starts Rigmind with live reload. `npm run dist` builds an installer in `release\` instead.
 6. In Rigmind:
-   - **Settings:** paste your Anthropic API key. Install PresentMon for FPS capture.
+   - **Settings > AI engine:** paste your Anthropic API key, or choose **Rigmind Local AI** for a free assistant that runs on your PC (one click installs Ollama and a model sized to your GPU). Install PresentMon for FPS capture.
    - **Cooling:** install the [PawnIO](https://pawnio.eu/) driver for motherboard fans and CPU temperature, then turn on fan control.
    - **Lighting:** install OpenRGB, then close iCUE, Armoury Crate and other brand RGB apps.
 
@@ -96,10 +107,20 @@ src/main/        Electron main process
   actions.ts     the fixed list of actions you can apply
   drivers.ts     driver and firmware checks
   updater.ts     auto-update from GitHub Releases
+  localai.ts     Rigmind Local AI (Ollama)
+  incidents.ts   Crash Detective + flight recorder
+  health.ts      boot times, temperature trends, driver impact
+  stress.ts      CPU + GPU stress test
+  security.ts    Defender control + intrusion watch
+  tune.ts        Display Doctor, shader caches, game configs, update hold
+  netmon.ts      ping / jitter / loss
+  energy.ts      power and cost
+  automations.ts plain-English rules engine
+  brain.ts       daily checkup, anomaly alerts, Autopilot
+  history.ts     change history with undo
+  gsi.ts         CS2 / Dota 2 game state (lighting + match recaps)
+  voice.ts, remote.ts, discord.ts, notes.ts
 src/renderer/    React UI (mock.ts powers the browser preview)
 src/shared/      types shared by both
 .github/         release build, secret scan, Dependabot
 ```
-=======
-AI-powered performance companion for Windows gaming PCs. Live monitoring, automatic Game Boost, frame-time stutter analysis explained by Claude, before/after fix testing, fan and RGB control, and one-click driver updates.
->>>>>>> 85d645bdb9f28e7b0f3dcfc9ccf0004a8c13e1e5

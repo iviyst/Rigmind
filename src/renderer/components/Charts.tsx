@@ -68,9 +68,10 @@ interface LineProps {
   height?: number;
   markers?: { sec: number; label: string }[];
   label: string;
+  xLabels?: string[]; // one per point; replaces the mm:ss axis
 }
 
-export function LineChart({ series, times, max, height = 220, markers = [], label }: LineProps) {
+export function LineChart({ series, times, max, height = 220, markers = [], label, xLabels }: LineProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [hover, setHover] = useState<number | null>(null);
   const W = 800, padL = 36, padB = 22, padT = 8;
@@ -125,8 +126,8 @@ export function LineChart({ series, times, max, height = 220, markers = [], labe
       {yTicks.map((t) => (
         <span key={t} className="axis-label" style={{ position: "absolute", left: 0, top: `${(y(t) / H) * 100}%`, transform: "translateY(-50%)", fontSize: 11, color: "var(--muted)" }}>{t}</span>
       ))}
-      {xTicks.map((t, i) => (
-        <span key={i} style={{ position: "absolute", left: `${(x(t) / W) * 100}%`, bottom: -18, transform: i === 0 ? "none" : i === 5 ? "translateX(-100%)" : "translateX(-50%)", fontSize: 11, color: "var(--muted)" }}>{mm(t)}</span>
+      {(xLabels ? times.map((t, i) => ({ t, l: xLabels[i] })).filter((_, i, a) => a.length <= 8 || i % Math.ceil(a.length / 6) === 0) : xTicks.map((t) => ({ t, l: mm(t) }))).map(({ t, l }, i, arr) => (
+        <span key={i} style={{ position: "absolute", left: `${(x(t) / W) * 100}%`, bottom: -18, transform: i === 0 ? "none" : i === arr.length - 1 ? "translateX(-100%)" : "translateX(-50%)", fontSize: 11, color: "var(--muted)" }}>{l}</span>
       ))}
       {hover != null &&
         series.map((s) => {
@@ -135,7 +136,7 @@ export function LineChart({ series, times, max, height = 220, markers = [], labe
         })}
       {hover != null && (
         <div className="tooltip" style={{ left: `${(x(times[hover]) / W) * 100}%`, top: 0 }}>
-          <div className="k" style={{ marginBottom: 4 }}>{mm(times[hover])}</div>
+          <div className="k" style={{ marginBottom: 4 }}>{xLabels ? xLabels[hover] : mm(times[hover])}</div>
           {series.map((s) => (
             <div key={s.name}>
               <span className="sw" style={{ background: s.color }} />

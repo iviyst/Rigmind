@@ -4,21 +4,40 @@ import { execFile } from "node:child_process";
 import { telemetry } from "./telemetry";
 import { boost } from "./boost";
 import { findPresentMon } from "./fps";
-import { load, save, publicSettings, setApiKey, getApiKey } from "./store";
-import { listSessions, getSession, deleteSession } from "./sessions";
+import { load, save, publicSettings, setApiKey, aiReady } from "./store";
+import { localAi } from "./localai";
+import { listSessions, deleteSession } from "./sessions";
 import * as ai from "./ai";
 import * as drivers from "./drivers";
 import { executeAction } from "./actions";
 import { getSystemInfo, isProtected } from "./winsys";
-import { showOverlay, hideOverlay, overlaySample } from "./overlay";
+import { showOverlay, hideOverlay, overlaySample, overlayToast } from "./overlay";
 import { hw } from "./hw";
 import { fans } from "./fans";
 import { rgb, findOpenRgb } from "./rgb";
 import { tests } from "./tests";
 import { updater } from "./updater";
 import { resource } from "./paths";
-import { listProfiles, saveProfile, deleteProfile, cpuHasCacheCcd } from "./profiles";
-import type { ChatMessage, ProposedAction, SessionDetail, Settings, GameProfile, FanSettings, RgbSettings, TestChangeKind } from "../shared/types";
+import { listProfiles, saveProfile, deleteProfile, cpuHasCacheCcd, getProfile } from "./profiles";
+import { history } from "./history";
+import { incidents } from "./incidents";
+import { bootReport, healthTrends, driverImpact } from "./health";
+import { stress } from "./stress";
+import { displayReport, setRefresh, shaderCacheInfo, clearShaderCaches, checkDriverChange } from "./tune";
+import { netmon } from "./netmon";
+import { energy } from "./energy";
+import { security } from "./security";
+import { automations } from "./automations";
+import { brain } from "./brain";
+import { listNotes, addNote, deleteNote } from "./notes";
+import { getSnapshot, getSession } from "./sessions";
+import { gsi } from "./gsi";
+import { voice } from "./voice";
+import { remote } from "./remote";
+import { discord } from "./discord";
+import { app as electronApp } from "electron";
+import { writeFileSync as writeFile } from "node:fs";
+import type { ChatMessage, ProposedAction, SessionDetail, Settings, GameProfile, FanSettings, RgbSettings, TestChangeKind, ExtrasSettings, MatchRecap } from "../shared/types";
 
 const isDev = !!process.env.VITE_DEV_SERVER_URL;
 const preload = join(__dirname, "preload.js");
@@ -146,7 +165,7 @@ function registerIpc() {
   guardIpc();
   ipcMain.handle("settings:get", () => publicSettings());
   ipcMain.handle("settings:save", (_e, patch: Partial<Settings>) => {
-    const { hasApiKey, ...rest } = patch as Settings;
+    const { hasApiKey, aiReady, ...rest } = patch as Settings;
     if (rest.startWithWindows !== undefined && rest.startWithWindows !== load().startWithWindows) setStartup(rest.startWithWindows);
     save(rest as any);
     return publicSettings();
@@ -176,6 +195,90 @@ function registerIpc() {
   ipcMain.handle("update:status", () => updater.status);
   ipcMain.handle("update:check", () => updater.check());
   ipcMain.handle("update:install", () => updater.install());
+  // ---- v1.2 ----
+  ipcMain.handle("inc:list", () => incidents.all());
+  ipcMain.handle("inc:explain", (_e, id: string) => ai.explainIncident(String(id)));
+  ipcMain.handle("health:boot", () => bootReport());
+  ipcMain.handle("health:trends", () => healthTrends());
+  ipcMain.handle("health:drivers", () => driverImpact());
+  ipcMain.handle("stress:start", (_e, seconds: number, label: string, cpu: boolean, gpu: boolean) =>
+    stress.start({ seconds: Number(seconds) || 300, label: String(label || "Stress test").slice(0, 80), cpu: !!cpu, gpu: !!gpu, loadPage, preload })
+  );
+  ipcMain.handle("stress:stop", () => stress.stop());
+  ipcMain.handle("stress:list", () => stress.list());
+  ipcMain.handle("stress:coach", (_e, q: string) => ai.coach(String(q ?? "").slice(0, 2000)));
+  ipcMain.handle("tune:display", () => displayReport());
+  ipcMain.handle("tune:refresh", (_e, device: string, hz: number) => setRefresh(String(device), Number(hz), "you"));
+  ipcMain.handle("tune:shaders", () => shaderCacheInfo());
+  ipcMain.handle("tune:clearShaders", () => clearShaderCaches("you"));
+  ipcMain.handle("tune:advice", (_e, game: string, goal: string) => ai.gameAdvice(String(game), String(goal ?? "").slice(0, 500)));
+  ipcMain.handle("net:status", () => netmon.status());
+  ipcMain.handle("energy:summary", () => energy.summary());
+  ipcMain.handle("bios:lookup", async () => {
+    const fw = drivers.lastScan()?.firmware.find((f) => f.kind === "bios");
+    if (!fw) throw new Error("Run a driver scan first so Rigmind knows your board.");
+    return ai.biosLookup(fw.name, fw.version, fw.date);
+  });
+  ipcMain.handle("sec:state", () => security.state());
+  ipcMain.handle("sec:check", () => security.check());
+  ipcMain.handle("sec:sweep", () => security.sweep());
+  ipcMain.handle("sec:scan", (_e, type: "QuickScan" | "FullScan") => security.scan(type === "FullScan" ? "FullScan" : "QuickScan"));
+  ipcMain.handle("sec:offline", () => security.offlineScan());
+  ipcMain.handle("sec:update", () => security.updateSignatures());
+  ipcMain.handle("sec:threat", (_e, id: string, action: "remove" | "allow" | "restore") => security.threatAction(String(id), ["remove", "allow", "restore"].includes(action) ? action : "remove"));
+  ipcMain.handle("sec:triage", (_e, id: string) => ai.triageAlert(String(id)));
+  ipcMain.handle("sec:dismiss", (_e, id: string) => security.dismiss(String(id)));
+  ipcMain.handle("sec:rename", (_e, mac: string, name: string) => security.renameDevice(String(mac), String(name ?? "").slice(0, 60)));
+  ipcMain.handle("sec:block", (_e, path: string) => security.blockApp(String(path), "you"));
+  ipcMain.handle("rules:list", () => automations.list());
+  ipcMain.handle("rules:add", async (_e, text: string) => automations.add(await ai.parseRule(String(text).slice(0, 600))));
+  ipcMain.handle("rules:toggle", (_e, id: string, on: boolean) => automations.toggle(String(id), !!on));
+  ipcMain.handle("rules:delete", (_e, id: string) => automations.remove(String(id)));
+  ipcMain.handle("checkup:list", () => brain.list());
+  ipcMain.handle("checkup:run", () => brain.checkup());
+  ipcMain.handle("notes:list", () => listNotes());
+  ipcMain.handle("notes:add", (_e, t: string) => addNote(String(t)));
+  ipcMain.handle("notes:delete", (_e, id: string) => deleteNote(String(id)));
+  ipcMain.handle("changes:list", () => history.entries());
+  ipcMain.handle("changes:undo", (_e, id: string) => history.undo(String(id)));
+  ipcMain.handle("snap:get", (_e, sid: string, f: string) => getSnapshot(String(sid), String(f)));
+  ipcMain.handle("match:list", () => gsi.recaps());
+  ipcMain.handle("match:recap", async (_e, id: string) => {
+    const m = gsi.recaps().find((x) => x.id === id);
+    if (!m) throw new Error("Match not found");
+    const text = await ai.recapMatch(m);
+    gsi.saveRecapSummary(m.id, text);
+    return text;
+  });
+  ipcMain.handle("voice:ask", () => voice.ask());
+  ipcMain.handle("remote:pairing", () => remote.pairing());
+  ipcMain.handle("remote:reset", () => (remote.resetToken(), remote.apply(), remote.pairing()));
+  ipcMain.handle("rigcard:save", (_e, dataUrl: string) => {
+    if (typeof dataUrl !== "string" || !dataUrl.startsWith("data:image/png;base64,")) return { ok: false, message: "Invalid image." };
+    const file = join(electronApp.getPath("pictures"), `Rigmind rig card ${new Date().toISOString().slice(0, 10)}.png`);
+    writeFile(file, Buffer.from(dataUrl.split(",")[1], "base64"));
+    shell.showItemInFolder(file);
+    return { ok: true, message: "Saved to your Pictures folder." };
+  });
+  ipcMain.handle("gsi:install", async () => {
+    const done = await gsi.install();
+    return done.length ? { ok: true, message: `Game lighting set up for ${done.join(" and ")}. Restart the game if it's open.` } : { ok: false, message: "Couldn't find CS2 or Dota 2 in your Steam libraries." };
+  });
+  ipcMain.handle("extras:get", () => load().extras);
+  ipcMain.handle("extras:save", (_e, patch: Partial<ExtrasSettings>) => {
+    const next = save({ extras: { ...load().extras, ...patch } }).extras;
+    voice.apply();
+    remote.apply();
+    discord.apply();
+    return next;
+  });
+  ipcMain.handle("localai:status", () => localAi.status());
+  ipcMain.handle("localai:setup", (_e, model?: string) => localAi.setup(typeof model === "string" && /^[\w.:-]{1,60}$/.test(model) ? model : undefined));
+  ipcMain.handle("aim:score", (_e, mode: string, score: number, avgMs: number) => {
+    const ex = load().extras;
+    const scores = [{ t: Date.now(), mode: String(mode).slice(0, 20), score: Number(score) || 0, avgMs: Number(avgMs) || 0 }, ...ex.aim.scores].slice(0, 200);
+    return save({ extras: { ...ex, aim: { ...ex.aim, scores } } }).extras;
+  });
   ipcMain.handle("sys:installTool", async (_e, tool: "presentmon" | "librehardwaremonitor" | "pawnio" | "openrgb") => {
     if (tool === "pawnio") {
       // PawnIO is a signed kernel driver; install it from its official site.
@@ -211,11 +314,11 @@ function registerIpc() {
   ipcMain.handle("telemetry:history", () => telemetry.history);
   ipcMain.handle("telemetry:procs", () => telemetry.procs);
   ipcMain.handle("sessions:list", () => listSessions());
-  ipcMain.handle("sessions:get", (_e, id: string) => getSession(id));
+  ipcMain.handle("sessions:get", (_e, id: string) => getSession(String(id)));
   ipcMain.handle("sessions:delete", (_e, id: string) => deleteSession(id));
   ipcMain.handle("sessions:analyze", (_e, id: string) => ai.analyzeSession(id));
   ipcMain.handle("ai:chat", (_e, h: ChatMessage[]) => ai.chat(h));
-  ipcMain.handle("ai:execute", (_e, a: ProposedAction) => executeAction(a, scanDrivers));
+  ipcMain.handle("ai:execute", (_e, a: ProposedAction) => executeAction(a, scanDrivers, "assistant"));
   ipcMain.handle("drivers:last", () => drivers.lastScan());
   ipcMain.handle("drivers:scan", () => scanDrivers());
   ipcMain.handle("drivers:installWu", (_e, ids: string[]) => drivers.installWindowsUpdate(ids, (m) => mainWin?.webContents.send("drivers:progress", m)));
@@ -244,6 +347,38 @@ else {
     rgb.init();
     updater.init();
     scheduleDriverChecks();
+    energy.init();
+    localAi.init();
+    localAi.on("status", (st) => mainWin?.webContents.send("localai:status", st));
+    netmon.init();
+    incidents.init();
+    security.init();
+    automations.init();
+    brain.init((a, source) => executeAction(a, scanDrivers, source));
+    void gsi.init();
+    voice.apply();
+    remote.apply();
+    discord.apply();
+    void checkDriverChange().then((d) => d && notify("GPU driver updated", `Driver ${d} detected. Rigmind cleared the old shader caches, so expect a few hitches while games rebuild them.`));
+
+    // Push live updates to the window.
+    const send = (ch: string) => (v: unknown) => mainWin?.webContents.send(ch, v);
+    stress.on("state", send("stress:state"));
+    netmon.on("status", send("net:status"));
+    security.on("state", send("sec:state"));
+    history.on("changed", send("changes:update"));
+    incidents.on("incident", (i) => {
+      mainWin?.webContents.send("inc:new", i);
+      const serious = ["gpu_reset", "bluescreen", "power_loss", "hardware_error"].includes(i.kind) || (i.app && getProfile(i.app));
+      if (serious) notify(i.title, "Open Health to see what happened and why.", "health");
+    });
+    security.on("alert", (a) => a.severity !== "info" && notify(a.title, a.detail.slice(0, 120), "security"));
+    brain.on("checkup", (c) => notify("Daily checkup ready", c.title, "health"));
+    brain.on("autopilot", (r: { from: string; done: string[] }) => notify("Autopilot made changes", `${r.done.join(", ")}. Undo any of them in Settings > Change history.`, "settings"));
+    voice.on("message", (m: { text: string; transient: boolean }) => {
+      if (!overlayToast(m.text) && !m.transient) notify("Rigmind", m.text);
+    });
+    gsi.on("match", (m: MatchRecap) => notify(`${m.game === "cs2" ? "CS2" : "Dota 2"} match saved`, "Open Sessions for your match recap.", "sessions"));
 
     hw.on("status", (st) => mainWin?.webContents.send("hw:status", st));
     fans.on("runtime", (r) => mainWin?.webContents.send("fans:runtime", r));
@@ -270,10 +405,13 @@ else {
       rgb.setGame(null);
       if (tests.current) tests.cancel();
       if (!detail) return;
+      const unusual = brain.anomaly(detail);
+      if (unusual) notify("Unusual session", unusual, "sessions");
       const summary = `${Math.round((detail.end - detail.start) / 60000)} min, ${detail.avgFps ?? "?"} FPS avg, ${detail.stutters} stutters.`;
-      if (load().boost.autoAnalyze && getApiKey()) {
+      if (load().boost.autoAnalyze && aiReady()) {
         try {
-          await ai.analyzeSession(detail.id);
+          const { actions } = await ai.analyzeSessionFull(detail.id);
+          void brain.autopilot(actions, `${detail.game} session`);
           notify(`${detail.game} session report`, summary + " Rigmind's analysis is ready.", "sessions");
           rgb.flash("#2f95db");
         } catch {
@@ -282,6 +420,8 @@ else {
       } else notify(`${detail.game} session saved`, summary, "sessions");
     });
   });
+
+  ipcMain.on("stress:lost", () => stress.gpuLost());
 
   app.on("before-quit", async (e) => {
     quitting = true;

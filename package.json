@@ -19,12 +19,14 @@
   "dependencies": {
     "@anthropic-ai/sdk": "latest",
     "electron-updater": "^6.8.11",
-    "openrgb-sdk": "^0.6.0"
+    "openrgb-sdk": "^0.6.0",
+    "qrcode": "^1.5.4"
   },
   "devDependencies": {
     "@fontsource/barlow": "latest",
     "@fontsource/chakra-petch": "latest",
     "@types/node": "^22",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "latest",

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../api";
 import { Setting, Switch, toast } from "../components/Bits";
 import { CurveEditor } from "../components/CurveEditor";
+import { RigDiagram } from "../components/RigDiagram";
 import type { FanControlCfg, FanProfileName, FanRuntime, FanSettings, HwStatus } from "../../shared/types";
 
 // Same curves as the engine (src/main/fans.ts) so the preview matches what's applied.
@@ -70,6 +71,7 @@ export function Cooling() {
           <button className="btn sm" onClick={async () => toast((await api.installTool("pawnio")).message)}>Get PawnIO</button>
         </div>
       )}
+      {hw.built && <RigDiagram hw={hw} rt={rt} />}
       {rt?.failsafe && <div className="notice" role="alert" style={{ borderColor: "var(--crit)", background: "rgba(240,86,95,.1)" }}>All fans at 100%: {rt.failsafe}. They'll come down once things are back to normal.</div>}
 
       {!cfg.riskAccepted ? (

@@ -7,6 +7,8 @@ import type { ChatMessage, GameState, ProposedAction, Settings } from "../../sha
 
 const STARTERS = [
   "Why does my game stutter?",
+  "Why did my PC crash?",
+  "Is anything on my network suspicious?",
   "Am I CPU or GPU bottlenecked?",
   "Is my RAM running at its rated speed?",
   "Are my temperatures OK?",
@@ -56,14 +58,14 @@ export function Assistant({ settings, game, messages, setMessages, draft, setDra
     setMessages(messages.map((m, i) => (i === mi ? { ...m, actions: m.actions?.map((x) => (x.id === a.id ? { ...x, state: r.ok ? "testing" : x.state, result: r.message } : x)) } : m)));
   };
 
-  if (!settings.hasApiKey)
+  if (!settings.aiReady)
     return (
       <div className="page">
         <h1>Assistant</h1>
         <section className="panel empty">
-          <h2>Connect Claude to get started</h2>
-          <p>The assistant reads your live stats, sessions and drivers, then explains what's wrong and offers one-click fixes. It needs your Anthropic API key.</p>
-          <button className="btn primary" onClick={goSettings}>Add API key</button>
+          <h2>Choose an AI engine to get started</h2>
+          <p>The assistant reads your live stats, sessions and drivers, then explains what's wrong and offers one-click fixes. Use Claude with your own API key, or set up the free Rigmind Local AI that runs on this PC.</p>
+          <button className="btn primary" onClick={goSettings}>Set up AI</button>
         </section>
       </div>
     );
@@ -73,7 +75,7 @@ export function Assistant({ settings, game, messages, setMessages, draft, setDra
       <div className="page-head">
         <div>
           <h1>Assistant</h1>
-          <p className="sub">Ask about performance. Rigmind checks your real numbers before answering, and nothing changes until you click Apply.</p>
+          <p className="sub">Ask about performance, crashes, security or your games. Rigmind checks your real numbers before answering, and nothing changes until you click Apply.{settings.aiProvider === "local" ? " Running on Rigmind Local AI." : ""}</p>
         </div>
         {messages.length > 0 && <button className="btn ghost" onClick={() => setMessages([])}>New chat</button>}
       </div>

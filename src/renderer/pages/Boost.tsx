@@ -85,8 +85,8 @@ export function Boost({ settings, setSettings, game }: { settings: Settings; set
             <Setting title="Session reports" desc="Records FPS, frame times and stutters for every session.">
               <Switch checked={b.sessionReports} onChange={(v) => patch({ sessionReports: v })} label="Session reports" />
             </Setting>
-            <Setting title="Explain each session with AI" desc={settings.hasApiKey ? "Rigmind writes up what caused any stutters when you quit." : "Add your Anthropic API key in Settings first."}>
-              <Switch checked={b.autoAnalyze && settings.hasApiKey} onChange={(v) => patch({ autoAnalyze: v })} label="Explain each session with AI" />
+            <Setting title="Explain each session with AI" desc={settings.aiReady ? "Rigmind writes up what caused any stutters when you quit." : "Set up an AI engine in Settings first."}>
+              <Switch checked={b.autoAnalyze && settings.aiReady} onChange={(v) => patch({ autoAnalyze: v })} label="Explain each session with AI" />
             </Setting>
           </div>
         </section>

@@ -6,7 +6,7 @@ import type { Telemetry } from "../shared/types";
 
 let win: BrowserWindow | null = null;
 const W = 230;
-const H = 132;
+const H = 260; // room for voice answers below the stats
 
 function position() {
   const { workArea } = screen.getPrimaryDisplay();
@@ -54,4 +54,11 @@ export function hideOverlay() {
 
 export function overlaySample(t: Telemetry) {
   win?.webContents.send("telemetry", t);
+}
+
+/** Show a short message in the overlay (voice answers). Returns false if no overlay is open. */
+export function overlayToast(text: string): boolean {
+  if (!win) return false;
+  win.webContents.send("overlay:toast", text);
+  return true;
 }

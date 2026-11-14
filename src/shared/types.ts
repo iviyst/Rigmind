@@ -63,6 +63,9 @@ export interface BoostSettings {
 export interface Settings {
   model: string;
   hasApiKey: boolean;
+  aiProvider: "claude" | "local";
+  localModel: string;
+  aiReady: boolean; // the chosen AI engine is set up
   startWithWindows: boolean;
   presentMonPath: string;
   boost: BoostSettings;
@@ -91,6 +94,7 @@ export interface StutterEvent {
   topProc: string | null; // busiest non-game process at the time
   cause?: StutterCause;
   why?: string; // one-line evidence for the cause
+  snapshot?: string | null; // file name of a screenshot taken at the hitch
 }
 
 export interface SessionSummary {
@@ -109,6 +113,10 @@ export interface SessionSummary {
   peakRamGB: number;
   analysis: string | null;
   causes?: Partial<Record<StutterCause, number>>;
+  driver?: string | null; // GPU driver version during the session
+  energyWh?: number | null;
+  anomaly?: string | null; // "Ran 14% slower than your usual"
+  pingAvg?: number | null;
 }
 
 export interface SessionPoint {
@@ -124,6 +132,7 @@ export interface SessionPoint {
   ram: number;
   gpuClock?: number | null;
   disk?: number | null; // read MB/s
+  ping?: number | null;
 }
 
 export interface SessionDetail extends SessionSummary {
@@ -159,6 +168,17 @@ export interface FirmwareItem {
   ageDays: number | null;
   advice: string;
   link: string;
+  guide?: { vendor: string; tool: string; steps: string[] };
+}
+
+export interface BiosLookup {
+  board: string;
+  current: string;
+  latest: string | null;
+  latestDate: string | null;
+  newer: boolean | null;
+  notes: string; // markdown: what the newer versions fix, warnings like "can't downgrade"
+  url: string | null;
 }
 
 export interface DriverScan {
@@ -233,7 +253,7 @@ export interface FanRuntime {
 // ---------- RGB ----------
 export interface RgbSettings {
   enabled: boolean;
-  mode: "status" | "static" | "off";
+  mode: "status" | "static" | "off" | "screen";
   color: string; // hex
   brightness: number; // 0-100
   alerts: boolean;
@@ -246,8 +266,9 @@ export interface RgbSettings {
 export interface RgbStatus {
   connected: boolean;
   installed: boolean;
-  devices: { id: number; name: string; type: string; leds: number }[];
+  devices: { id: number; name: string; type: string; leds: number; state: "direct" | "static" | "no-leds" | "unsupported" }[];
   current: string; // hex currently shown
+  gameEvent?: string | null; // e.g. "Bomb planted" when game lighting is active
   reason: string; // why that color ("CPU 64°C", "Lights off on schedule"...)
   error: string | null;
 }
@@ -266,6 +287,7 @@ export interface GameProfile {
   suggestedPause: string[]; // learned from background-app stutters
   sessions: number;
   lastPlayed: number | null;
+  installDir?: string | null;
 }
 
 // ---------- Before/after tests ----------
@@ -324,7 +346,14 @@ export type ActionKind =
   | "scan_drivers"
   | "set_game_affinity_cache"
   | "raise_game_priority"
-  | "apply_fan_profile";
+  | "apply_fan_profile"
+  | "set_refresh_rate"
+  | "add_defender_exclusion"
+  | "clear_shader_cache"
+  | "block_app_firewall"
+  | "quick_scan"
+  | "remove_threat"
+  | "disable_startup_review";
 
 export interface ProposedAction {
   id: string;
@@ -361,7 +390,79 @@ export interface SystemInfo {
   displays: string[];
 }
 
+export interface LocalAiStatus {
+  installed: boolean;
+  running: boolean;
+  models: string[];
+  recommended: string;
+  vramGB: number | null;
+  pulling: { model: string; pct: number; status: string } | null;
+}
+
 export interface RigmindApi {
+  localAiStatus(): Promise<LocalAiStatus>;
+  localAiSetup(model?: string): Promise<{ ok: boolean; message: string }>;
+  onLocalAi(cb: (s: LocalAiStatus) => void): () => void;
+  // v1.2: health
+  listIncidents(): Promise<Incident[]>;
+  explainIncident(id: string): Promise<string>;
+  onIncident(cb: (i: Incident) => void): () => void;
+  bootReport(): Promise<BootReport>;
+  healthTrends(): Promise<{ weeks: HealthTrend[]; warning: string | null }>;
+  driverImpact(): Promise<DriverImpact[]>;
+  stressStart(seconds: number, label: string, cpu: boolean, gpu: boolean): Promise<StressResult | { error: string }>;
+  stressStop(): Promise<void>;
+  stressList(): Promise<StressResult[]>;
+  onStress(cb: (s: StressState) => void): () => void;
+  coachAsk(question: string): Promise<string>;
+  // tune
+  displayReport(): Promise<DisplayReport>;
+  setRefresh(device: string, hz: number): Promise<{ ok: boolean; message: string }>;
+  shaderInfo(): Promise<ShaderCacheInfo>;
+  clearShaders(): Promise<{ ok: boolean; message: string }>;
+  gameAdvice(game: string, goal: string): Promise<string>;
+  netStatus(): Promise<NetStatus>;
+  onNet(cb: (n: NetStatus) => void): () => void;
+  energySummary(): Promise<EnergySummary>;
+  biosLookup(): Promise<BiosLookup>;
+  // security
+  securityState(): Promise<SecurityState>;
+  onSecurity(cb: (s: SecurityState) => void): () => void;
+  securityCheck(): Promise<SecurityState>;
+  securitySweep(): Promise<SecurityState>;
+  defenderScan(type: "QuickScan" | "FullScan"): Promise<{ ok: boolean; message: string }>;
+  defenderOffline(): Promise<{ ok: boolean; message: string }>;
+  defenderUpdate(): Promise<{ ok: boolean; message: string }>;
+  threatAction(id: string, action: "remove" | "allow" | "restore"): Promise<{ ok: boolean; message: string }>;
+  triageAlert(id: string): Promise<string>;
+  dismissAlert(id: string): Promise<void>;
+  renameDevice(mac: string, name: string): Promise<void>;
+  blockApp(path: string): Promise<{ ok: boolean; message: string }>;
+  // AI brain
+  listRules(): Promise<Rule[]>;
+  addRule(text: string): Promise<Rule[]>;
+  toggleRule(id: string, enabled: boolean): Promise<Rule[]>;
+  deleteRule(id: string): Promise<Rule[]>;
+  listCheckups(): Promise<Checkup[]>;
+  runCheckup(): Promise<Checkup>;
+  listNotes(): Promise<RigNote[]>;
+  addNote(text: string): Promise<RigNote[]>;
+  deleteNote(id: string): Promise<RigNote[]>;
+  listChanges(): Promise<ChangeEntry[]>;
+  undoChange(id: string): Promise<{ ok: boolean; message: string }>;
+  onChanges(cb: (c: ChangeEntry[]) => void): () => void;
+  // fun
+  getSnapshot(sessionId: string, file: string): Promise<string | null>;
+  listMatches(): Promise<MatchRecap[]>;
+  recapMatch(id: string): Promise<string>;
+  voiceAsk(): Promise<void>;
+  remotePairing(): Promise<{ url: string | null; qr: string | null }>;
+  remoteReset(): Promise<{ url: string | null; qr: string | null }>;
+  saveRigCard(dataUrl: string): Promise<{ ok: boolean; message: string }>;
+  installGameLighting(): Promise<{ ok: boolean; message: string }>;
+  getExtras(): Promise<ExtrasSettings>;
+  saveExtras(patch: Partial<ExtrasSettings>): Promise<ExtrasSettings>;
+  saveAimScore(mode: string, score: number, avgMs: number): Promise<ExtrasSettings>;
   // hardware, fans, rgb
   getHwStatus(): Promise<HwStatus>;
   onHwStatus(cb: (s: HwStatus) => void): () => void;
@@ -425,3 +526,269 @@ export const TESTABLE: Partial<Record<ActionKind, TestChangeKind>> = {
   set_game_affinity_cache: "affinity_cache",
   raise_game_priority: "priority_high",
 };
+
+// =====================================================================
+// v1.2: health, tuning, security, AI brain, fun features
+// =====================================================================
+
+export interface DisplayInfo {
+  device: string;
+  gpu: string;
+  monitor: string;
+  width: number;
+  height: number;
+  hz: number;
+  maxHz: number;
+  rates: number[];
+  maxWidth: number;
+  maxHeight: number;
+}
+
+export interface DisplayReport {
+  displays: DisplayInfo[];
+  vrrWindows: boolean | null; // Windows "Variable refresh rate" setting
+  issues: { device: string; text: string; fix?: { hz: number } }[];
+}
+
+export type IncidentKind = "app_crash" | "app_hang" | "gpu_reset" | "hardware_error" | "bluescreen" | "power_loss";
+
+export interface Incident {
+  id: string;
+  t: number;
+  kind: IncidentKind;
+  title: string; // "Cyberpunk2077.exe crashed"
+  detail: string; // raw-ish facts from the event log
+  app?: string;
+  context?: { cpu: number | null; gpu: number | null; cpuTemp: number | null; gpuTemp: number | null; gpuPowerW: number | null; ramGB: number | null; source: "live" | "flight-recorder" | "session" } | null;
+  driver?: string | null;
+  explanation?: string | null;
+}
+
+export interface BootRecord {
+  t: number;
+  bootSec: number;
+  mainPathSec: number;
+  postBootSec: number;
+}
+
+export interface BootReport {
+  boots: BootRecord[];
+  slowItems: { name: string; kind: string; delaySec: number; t: number }[];
+}
+
+export interface StressResult {
+  id: string;
+  t: number;
+  label: string; // "Stress test" or the undervolt step, e.g. "0.900 V @ 1950 MHz"
+  seconds: number;
+  passed: boolean;
+  reason: string;
+  maxCpuTemp: number | null;
+  maxGpuTemp: number | null;
+  avgGpuPowerW: number | null;
+  avgGpuClock: number | null;
+  minGpuClock: number | null;
+  avgCpuClock: number | null;
+  throttled: boolean;
+  samples: { s: number; cpuTemp: number | null; gpuTemp: number | null; gpuClock: number | null; gpuPower: number | null }[];
+}
+
+export interface StressState {
+  running: boolean;
+  label: string;
+  progress: number;
+  seconds: number;
+  elapsed: number;
+  live: { cpuTemp: number | null; gpuTemp: number | null; gpuClock: number | null; gpuPower: number | null } | null;
+}
+
+export interface HealthTrend {
+  week: string; // ISO week start, e.g. "2026-11-09"
+  gpuTempAtLoad: number | null;
+  cpuTempAtLoad: number | null;
+  sessions: number;
+}
+
+export interface DriverImpact {
+  game: string;
+  exe: string;
+  rows: { driver: string; sessions: number; avgFps: number | null; low1: number | null }[];
+  verdict: string | null; // "1% lows 9% lower since 591.44"
+}
+
+export interface ShaderCacheInfo {
+  caches: { name: string; path: string; mb: number }[];
+  totalMb: number;
+  autoClearOnDriverUpdate: boolean;
+  lastCleared: number | null;
+}
+
+export interface GameConfigInfo {
+  game: string;
+  path: string;
+  content: string; // truncated
+}
+
+export interface NetStatus {
+  targets: { host: string; label: string; ms: number | null; avg: number | null; jitter: number | null; loss: number }[];
+  wifi: { ssid: string; signal: number; band: string } | null;
+  gameServers: string[];
+}
+
+export interface EnergySummary {
+  today: { kWh: number; cost: number };
+  month: { kWh: number; cost: number };
+  nowW: number | null;
+  rate: number; // $/kWh
+  days: { day: string; kWh: number; cost: number }[];
+}
+
+export interface ChangeEntry {
+  id: string;
+  t: number;
+  label: string;
+  source: "you" | "assistant" | "autopilot" | "automation";
+  undoable: boolean;
+  undone: boolean;
+}
+
+export interface RigNote {
+  id: string;
+  t: number;
+  text: string;
+}
+
+// ---------- Automations ----------
+export type RuleTrigger =
+  | { type: "game_start"; game?: string }
+  | { type: "game_end"; game?: string }
+  | { type: "temp_above"; source: "cpu" | "gpu"; value: number }
+  | { type: "time"; at: string }
+  | { type: "idle"; minutes: number }
+  | { type: "app_start"; app: string };
+
+export type RuleAction =
+  | { type: "fan_profile"; value: FanProfileName }
+  | { type: "light_mode"; value: "status" | "static" | "off" | "screen" }
+  | { type: "light_color"; value: string }
+  | { type: "pause_app"; value: string }
+  | { type: "end_app"; value: string }
+  | { type: "power_plan"; value: "high" | "balanced" }
+  | { type: "notify"; value: string };
+
+export interface Rule {
+  id: string;
+  enabled: boolean;
+  text: string; // what the user wrote
+  summary: string; // plain-English restatement
+  trigger: RuleTrigger;
+  between?: { from: string; to: string } | null;
+  actions: RuleAction[];
+  lastRun: number | null;
+}
+
+export interface Checkup {
+  id: string;
+  t: number;
+  title: string;
+  report: string; // markdown
+  actions: ProposedAction[];
+}
+
+// ---------- Security ----------
+export interface DefenderStatus {
+  available: boolean;
+  realTime: boolean;
+  tamperProtection: boolean | null;
+  signatureAgeDays: number | null;
+  signatureVersion: string | null;
+  lastQuickScan: string | null;
+  lastFullScan: string | null;
+  scanning: boolean;
+  thirdPartyAv: string | null; // another antivirus is active
+}
+
+export interface Threat {
+  id: string;
+  name: string;
+  severity: string;
+  status: string; // "Quarantined", "Removed", "Allowed", "Active"...
+  resources: string[];
+  detected: string | null;
+}
+
+export interface Listener {
+  process: string;
+  pid: number;
+  port: number;
+  protocol: "TCP" | "UDP";
+  address: string; // 0.0.0.0 = all networks
+  path: string | null;
+  signer: string | null;
+  firstSeen: number;
+  isNew: boolean;
+}
+
+export interface LanDevice {
+  ip: string;
+  mac: string;
+  vendorHint: string | null;
+  firstSeen: number;
+  lastSeen: number;
+  isNew: boolean;
+  name: string | null; // user label
+}
+
+export type SecurityAlertKind = "new_listener" | "failed_logins" | "new_admin" | "new_service" | "new_task" | "new_device" | "exposure" | "threat";
+
+export interface SecurityAlert {
+  id: string;
+  t: number;
+  kind: SecurityAlertKind;
+  severity: "info" | "warn" | "high";
+  title: string;
+  detail: string;
+  dismissed: boolean;
+  triage?: string | null;
+}
+
+export interface SecurityState {
+  defender: DefenderStatus | null;
+  threats: Threat[];
+  listeners: Listener[];
+  devices: LanDevice[];
+  exposure: { item: string; ok: boolean; detail: string }[];
+  alerts: SecurityAlert[];
+  lastCheck: number | null;
+}
+
+// ---------- Settings for v1.2 features ----------
+export interface ExtrasSettings {
+  holdWindowsUpdate: boolean; // during games
+  autoClearShaders: boolean; // after a GPU driver update
+  snapshots: boolean; // stutter screenshots
+  energyRate: number; // $/kWh
+  baselineWatts: number; // rest of the system
+  voice: { enabled: boolean; hotkey: string; speak: boolean };
+  remote: { enabled: boolean; port: number; token: string; allowControl: boolean };
+  discord: { enabled: boolean; appId: string };
+  gameLighting: boolean; // CS2 / Dota 2 game state lighting
+  checkup: { enabled: boolean; hour: number };
+  anomalyAlerts: boolean;
+  autopilot: boolean;
+  rigLayout: Record<string, string>; // slot -> fan controlId
+  security: { watch: boolean; alertNewDevices: boolean; alertNewListeners: boolean };
+  playstyle: string; // e.g. "Competitive CS2 and Valorant, casual Minecraft building"
+  aim: { dpi: number; scores: { t: number; mode: string; score: number; avgMs: number }[] };
+}
+
+export interface MatchRecap {
+  id: string;
+  game: "cs2" | "dota2";
+  start: number;
+  end: number;
+  map: string | null;
+  stats: Record<string, number | string | null>; // kills, deaths, rounds won...
+  rounds: { n: number; won: boolean | null; kills: number; died: boolean; fps: number | null; ping: number | null }[];
+  summary: string | null;
+}

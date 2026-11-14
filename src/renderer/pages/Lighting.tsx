@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import { Setting, Switch, toast } from "../components/Bits";
-import type { RgbSettings, RgbStatus } from "../../shared/types";
+import type { RgbSettings, RgbStatus, ExtrasSettings } from "../../shared/types";
 
 const SWATCHES = ["#2f95db", "#e2468b", "#3fc88a", "#f2a93b", "#9b6bff", "#ffffff"];
 
@@ -9,10 +9,12 @@ export function Lighting() {
   const [cfg, setCfg] = useState<RgbSettings | null>(null);
   const [st, setSt] = useState<RgbStatus | null>(null);
   const [busy, setBusy] = useState(false);
+  const [ex, setEx] = useState<ExtrasSettings | null>(null);
 
   useEffect(() => {
     api.getRgbSettings().then(setCfg);
     api.getRgbStatus().then(setSt);
+    api.getExtras().then(setEx);
     return api.onRgbStatus(setSt);
   }, []);
   if (!cfg || !st) return null;
@@ -31,9 +33,13 @@ export function Lighting() {
       <section className="panel light-hero">
         <div className="glow" style={{ background: st.connected && cfg.enabled ? st.current : "var(--line)", boxShadow: st.connected && cfg.enabled ? `0 0 60px 6px ${st.current}55` : "none" }} aria-hidden />
         <div style={{ flex: 1 }}>
-          <h2>{!cfg.enabled ? "RGB control is off" : st.connected ? st.reason || "Connected" : "Not connected to OpenRGB"}</h2>
+          <h2>{st.gameEvent ? st.gameEvent : !cfg.enabled ? "RGB control is off" : !st.connected ? "Not connected to OpenRGB" : !st.devices.length ? "Waiting for OpenRGB to find your lights" : st.reason || "Connected"}</h2>
           <p className="sub">
-            {st.connected ? `${st.devices.length} device${st.devices.length === 1 ? "" : "s"}: ${st.devices.map((d) => d.name).join(", ")}` : "Rigmind talks to your lights through OpenRGB, which supports Corsair, ASUS, MSI, Gigabyte, Razer, Logitech, RAM and more."}
+            {!st.connected
+              ? "Rigmind talks to your lights through OpenRGB, which supports Corsair, ASUS, MSI, Gigabyte, Razer, Logitech, RAM and more."
+              : !st.devices.length
+              ? "OpenRGB is running but hasn't reported any devices yet. Detection can take up to 20 seconds. If none appear, open OpenRGB and check its device list."
+              : `Controlling ${st.devices.filter((d) => d.state === "direct" || d.state === "static").length} of ${st.devices.length} devices.`}
           </p>
         </div>
         {!st.connected && cfg.enabled && (
@@ -44,15 +50,39 @@ export function Lighting() {
           )
         )}
       </section>
-      {!st.connected && cfg.enabled && <div className="notice info">Close iCUE, Armoury Crate, Mystic Light or RGB Fusion first. They fight over the same lights. RAM and some motherboards also need the PawnIO driver.</div>}
+      {st.connected && st.devices.length > 0 && (
+        <section className="panel">
+          <h2>Devices</h2>
+          <table className="list" style={{ marginTop: 10 }}>
+            <tbody>
+              {st.devices.map((d) => (
+                <tr key={d.id}>
+                  <td>{d.name}</td>
+                  <td className="muted">{d.leds} LEDs</td>
+                  <td className="num">
+                    {d.state === "direct" ? <span className="tag good">Working</span>
+                    : d.state === "static" ? <span className="tag good">Working (one color at a time)</span>
+                    : d.state === "no-leds" ? <span className="tag warn">0 LEDs: resize its zones in OpenRGB</span>
+                    : <span className="tag neutral">No supported mode</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {st.devices.some((d) => d.state === "no-leds") && (
+            <p className="muted small" style={{ marginBottom: 0 }}>Fans on motherboard ARGB headers start at 0 LEDs. In OpenRGB, open the device, click Resize on each ARGB zone, enter the LED count of the fans on it, then save the profile.</p>
+          )}
+        </section>
+      )}
+      {cfg.enabled && (!st.connected || !st.devices.length) && <div className="notice info">Close iCUE, Armoury Crate, Mystic Light or RGB Fusion first. They fight over the same lights. RAM and some motherboards also need the PawnIO driver.</div>}
 
       <div className="grid-2">
         <section className="panel">
           <h2>Mode</h2>
           <div className="seg" role="radiogroup" style={{ margin: "12px 0 6px" }}>
-            {(["status", "static", "off"] as const).map((m) => (
+            {(["status", "screen", "static", "off"] as const).map((m) => (
               <button key={m} role="radio" aria-checked={cfg.mode === m} className={cfg.mode === m ? "on" : ""} onClick={() => save({ mode: m })}>
-                {m === "status" ? "Show PC status" : m === "static" ? "One color" : "Off"}
+                {m === "status" ? "Show PC status" : m === "screen" ? "Match screen" : m === "static" ? "One color" : "Off"}
               </button>
             ))}
           </div>
@@ -65,6 +95,7 @@ export function Lighting() {
             </div>
           )}
           {cfg.mode === "status" && <div className="status-ramp" aria-hidden><span>40°C</span><span>85°C</span></div>}
+          {cfg.mode === "screen" && <p className="muted small">Your lights follow the colors on screen, four times a second. Works best with borderless or windowed games.</p>}
           <Setting title={`Brightness ${cfg.brightness}%`}>
             <input type="range" min={5} max={100} value={cfg.brightness} onChange={(e) => save({ brightness: Number(e.target.value) })} aria-label="Brightness" style={{ width: 200 }} />
           </Setting>
@@ -75,6 +106,14 @@ export function Lighting() {
           <Setting title="Heat alerts" desc="Pulses red if the CPU passes 90°C or the GPU passes 85°C.">
             <Switch checked={cfg.alerts} onChange={(v) => save({ alerts: v })} label="Heat alerts" />
           </Setting>
+          {ex && (
+            <Setting title="React to the game" desc="CS2 and Dota 2: flash on kills, pulse red at low health, count down the bomb. Uses the games' official state feed.">
+              <div className="row">
+                <button className="btn sm" onClick={async () => toast((await api.installGameLighting()).message)}>Set up</button>
+                <Switch checked={ex.gameLighting} onChange={async (v) => setEx(await api.saveExtras({ gameLighting: v }))} label="Game-reactive lighting" />
+              </div>
+            </Setting>
+          )}
           <Setting title="Game colors" desc="Each game can have its own color. Set it in the game's profile on the Game Boost page.">
             <Switch checked={cfg.gameScenes} onChange={(v) => save({ gameScenes: v })} label="Game colors" />
           </Setting>

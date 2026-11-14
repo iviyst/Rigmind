@@ -7,7 +7,9 @@ import { detectGame, friendlyName } from "./games";
 import { load, save } from "./store";
 import { SessionRecorder } from "./sessions";
 import * as win from "./winsys";
-import { ensureProfile, learnFromSession, pinToCacheCcd } from "./profiles";
+import { ensureProfile, learnFromSession, pinToCacheCcd, saveProfile } from "./profiles";
+import { holdUpdates } from "./tune";
+import { dirname } from "node:path";
 import type { GameState, GameProfile, ProcInfo, SessionDetail } from "../shared/types";
 
 class GameBoost extends EventEmitter {
@@ -80,7 +82,8 @@ class GameBoost extends EventEmitter {
     this.busy = true;
     const cfg = load().boost;
     const name = friendlyName(g);
-    const prof = (this.profile = ensureProfile(g.name, name));
+    let prof = (this.profile = ensureProfile(g.name, name));
+    if (g.path && prof.installDir !== dirname(g.path)) prof = this.profile = (saveProfile({ ...prof, installDir: dirname(g.path) }), { ...prof, installDir: dirname(g.path) });
     this.set({ active: true, game: prof.name, exe: g.name, pid: g.pid, since: Date.now(), boosted: false, fpsCapture: "off", suspended: [] });
     try {
       if (cfg.enabled) {
@@ -96,6 +99,7 @@ class GameBoost extends EventEmitter {
           this.paused = await win.suspendByName(list.filter((n) => n.toLowerCase() !== g.name.toLowerCase()));
           save({ pendingResume: this.paused });
         }
+        await holdUpdates(true);
         this.set({ boosted: true, suspended: [...new Set(this.paused.map((p) => p.name))] });
       }
       const capturing = fps.start(g.pid);
@@ -119,6 +123,7 @@ class GameBoost extends EventEmitter {
     try {
       fps.stop();
       if (this.paused.length) await win.resumePids(this.paused.map((p) => p.pid)).catch(() => {});
+      await holdUpdates(false);
       this.paused = [];
       const s = load();
       if (s.savedPowerScheme) await win.setPowerScheme(s.savedPowerScheme).catch(() => {});

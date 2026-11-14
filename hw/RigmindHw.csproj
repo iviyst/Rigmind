@@ -13,11 +13,15 @@
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <InvariantGlobalization>true</InvariantGlobalization>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- Screen capture (stutter snapshots, screen-glow lighting). -->
+    <UseWindowsForms>true</UseWindowsForms>
   </PropertyGroup>
 
   <ItemGroup>
     <!-- 0.9.5+ uses the PawnIO driver instead of WinRing0 (which Defender flags). -->
     <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.*" />
+    <!-- Offline speech recognition and text-to-speech for the voice copilot. -->
+    <PackageReference Include="System.Speech" Version="8.0.0" />
   </ItemGroup>
 
 </Project>

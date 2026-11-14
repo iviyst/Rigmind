@@ -76,7 +76,7 @@ export function Sessions({ settings, onAsk }: { settings: Settings; onAsk: (q: s
             </button>
           ))}
         </section>
-        {detail && <Detail s={detail} analyzing={analyzing} canAnalyze={settings.hasApiKey} onAnalyze={analyze} onDelete={remove} onAsk={onAsk} />}
+        {detail && <Detail s={detail} analyzing={analyzing} canAnalyze={settings.aiReady} onAnalyze={analyze} onDelete={remove} onAsk={onAsk} />}
       </div>
     </div>
   );
@@ -114,6 +114,7 @@ function Detail({ s, analyzing, canAnalyze, onAnalyze, onDelete, onAsk }: { s: S
           </div>
           <button className="btn ghost sm" onClick={onDelete}>Delete session</button>
         </div>
+        {s.anomaly && <div className="notice" style={{ marginBottom: 14 }}>{s.anomaly}</div>}
         <div className="stats">
           <Stat k="Average FPS" v={s.avgFps ?? "–"} />
           <Stat k="1% low" v={s.low1 ?? "–"} tone={smooth != null && smooth < 0.5 ? "warn" : undefined} />
@@ -121,6 +122,11 @@ function Detail({ s, analyzing, canAnalyze, onAnalyze, onDelete, onAsk }: { s: S
           <Stat k="Hottest CPU" v={s.maxCpuTemp != null ? `${s.maxCpuTemp}°` : "–"} tone={(s.maxCpuTemp ?? 0) >= 90 ? "crit" : undefined} />
           <Stat k="Hottest GPU" v={s.maxGpuTemp != null ? `${s.maxGpuTemp}°` : "–"} tone={(s.maxGpuTemp ?? 0) >= 85 ? "crit" : undefined} />
         </div>
+        {(s.pingAvg != null || s.energyWh != null || s.driver) && (
+          <p className="muted small" style={{ margin: "12px 0 0" }}>
+            {[s.pingAvg != null ? `Ping ${s.pingAvg} ms` : null, s.energyWh ? `Used ${(s.energyWh / 1000).toFixed(2)} kWh` : null, s.driver ? `GPU driver ${s.driver}` : null].filter(Boolean).join(". ")}
+          </p>
+        )}
       </section>
 
       {hasFps && (
@@ -159,6 +165,8 @@ function Detail({ s, analyzing, canAnalyze, onAnalyze, onDelete, onAsk }: { s: S
         </section>
       )}
 
+      <Snapshots s={s} />
+
       <section className="panel">
         <div className="panel-head">
           <h2>CPU and GPU load</h2>
@@ -187,7 +195,7 @@ function Detail({ s, analyzing, canAnalyze, onAnalyze, onDelete, onAsk }: { s: S
             <button className="btn sm" disabled={!canAnalyze || analyzing} onClick={onAnalyze}>{s.analysis ? "Analyze again" : "Analyze session"}</button>
           </div>
         </div>
-        {analyzing ? <Thinking /> : s.analysis ? <Markdown text={s.analysis} /> : <p className="muted" style={{ margin: 0 }}>{canAnalyze ? "Rigmind will look at every stutter and what else was happening on your PC at that moment." : "Add your Anthropic API key in Settings to get an explanation of this session."}</p>}
+        {analyzing ? <Thinking /> : s.analysis ? <Markdown text={s.analysis} /> : <p className="muted" style={{ margin: 0 }}>{canAnalyze ? "Rigmind will look at every stutter and what else was happening on your PC at that moment." : "Set up an AI engine in Settings to get an explanation of this session."}</p>}
       </section>
     </div>
   );
@@ -199,5 +207,35 @@ function Stat({ k, v, tone }: { k: string; v: string | number; tone?: "warn" | "
       <div className="v" style={tone ? { color: `var(--${tone})` } : undefined}>{v}</div>
       <div className="k">{k}</div>
     </div>
+  );
+}
+
+function Snapshots({ s }: { s: SessionDetail }) {
+  const withSnap = s.stutterEvents.filter((e) => e.snapshot);
+  const [imgs, setImgs] = useState<Record<string, string | null>>({});
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const out: Record<string, string | null> = {};
+      for (const e of withSnap.slice(0, 12)) out[e.snapshot!] = await api.getSnapshot(s.id, e.snapshot!);
+      if (alive) setImgs(out);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [s.id]);
+  if (!withSnap.length) return null;
+  return (
+    <section className="panel">
+      <div className="panel-head"><h2>What was on screen</h2><span className="muted small">Screenshots taken at big stutters</span></div>
+      <div className="snaps">
+        {withSnap.slice(0, 12).map((e) => (
+          <figure key={e.snapshot}>
+            {imgs[e.snapshot!] ? <img src={imgs[e.snapshot!]!} alt={`Screen at ${e.frametimeMs} ms stutter`} /> : <div className="snap-ph" />}
+            <figcaption>{Math.floor((e.t - s.start) / 60000)}:{String(Math.floor(((e.t - s.start) / 1000) % 60)).padStart(2, "0")}, {e.frametimeMs} ms{e.cause ? `, ${CAUSE_LABELS[e.cause].toLowerCase()}` : ""}</figcaption>
+          </figure>
+        ))}
+      </div>
+    </section>
   );
 }

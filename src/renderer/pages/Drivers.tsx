@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { api, fmt } from "../api";
 import { Thinking, toast } from "../components/Bits";
 import { IconExternal } from "../components/Icons";
-import type { DriverItem, DriverScan } from "../../shared/types";
+import type { DriverItem, DriverScan, BiosLookup, FirmwareItem } from "../../shared/types";
+import { Markdown } from "../components/Bits";
 
 const statusTag = (s: DriverItem["status"]) =>
   s === "update" ? <span className="tag warn">Update available</span> : s === "current" ? <span className="tag good">Up to date</span> : s === "check" ? <span className="tag neutral">Check maker's tool</span> : <span className="tag neutral">Unknown</span>;
@@ -127,7 +128,8 @@ export function Drivers() {
           <section className="panel">
             <h2>Firmware</h2>
             <p className="sub small">Rigmind checks firmware but never installs it for you. A failed BIOS flash can leave a PC unable to start, so do it yourself with the maker's tool, plugged into reliable power.</p>
-            {scan.firmware.map((f) => (
+            {scan.firmware.filter((f) => f.kind === "bios").map((f) => <BiosAssistant key="bios" f={f} />)}
+            {scan.firmware.filter((f) => f.kind !== "bios").map((f) => (
               <div key={f.kind + f.name} className="driver">
                 <div>
                   <h3>{f.kind === "bios" ? `BIOS on ${f.name}` : f.name}</h3>
@@ -159,6 +161,54 @@ export function Drivers() {
             ))}
           </section>
         </>
+      )}
+    </div>
+  );
+}
+
+function BiosAssistant({ f }: { f: FirmwareItem }) {
+  const [look, setLook] = useState<BiosLookup | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState<Set<number>>(new Set());
+  const [showSteps, setShowSteps] = useState(false);
+  const old = (f.ageDays ?? 0) > 365;
+  return (
+    <div className="driver" style={{ gridTemplateColumns: "1fr" }}>
+      <div className="row between wrap">
+        <div>
+          <h3>BIOS on {f.name}</h3>
+          <div className="ver">Version {f.version}{f.date ? `, released ${f.date}` : ""}{f.ageDays ? ` (${Math.floor(f.ageDays / 365)} yr ${Math.floor((f.ageDays % 365) / 30)} mo old)` : ""}</div>
+        </div>
+        <div className="row">
+          {old ? <span className="tag warn">Over a year old</span> : <span className="tag neutral">Check with maker</span>}
+          <button className="btn sm" disabled={busy} onClick={async () => { setBusy(true); try { setLook(await api.biosLookup()); } catch (e: any) { toast(String(e?.message ?? e).replace(/^Error invoking remote method '[^']+': (Error: )?/, "")); } setBusy(false); }}>{busy ? "Looking…" : "Find the latest BIOS"}</button>
+          <button className="btn sm" onClick={() => api.openExternal(look?.url ?? f.link)}>Support page <IconExternal /></button>
+        </div>
+      </div>
+      {look && (
+        <div className="notice info" style={{ marginTop: 6 }}>
+          <b>{look.newer ? `Newer BIOS available: ${look.latest}${look.latestDate ? `, ${look.latestDate}` : ""}` : look.newer === false ? `You're on the newest BIOS (${look.latest ?? look.current}).` : "Couldn't confirm the newest version."}</b>
+          <div style={{ marginTop: 6 }}><Markdown text={look.notes} /></div>
+        </div>
+      )}
+      <div className="note">{f.advice}</div>
+      {f.guide && (
+        <div>
+          <button className="btn ghost sm" style={{ paddingLeft: 0 }} aria-expanded={showSteps} onClick={() => setShowSteps(!showSteps)}>{showSteps ? "Hide" : "Show"} the safe update steps for {f.guide.vendor} {f.guide.tool}</button>
+          {showSteps && (
+            <ol className="stack" style={{ gap: 8, margin: "6px 0 0", paddingLeft: 0, listStyle: "none" }}>
+              {f.guide.steps.map((step, i) => (
+                <li key={i}>
+                  <label className="row" style={{ alignItems: "flex-start", cursor: "pointer" }}>
+                    <input type="checkbox" checked={done.has(i)} onChange={() => { const n = new Set(done); n.has(i) ? n.delete(i) : n.add(i); setDone(n); }} style={{ marginTop: 4 }} />
+                    <span style={done.has(i) ? { color: "var(--muted)", textDecoration: "line-through" } : undefined}><b>Step {i + 1}.</b> {step}</span>
+                  </label>
+                </li>
+              ))}
+            </ol>
+          )}
+          <p className="muted small" style={{ marginBottom: 0 }}>Rigmind never flashes firmware or uses unofficial BIOS files. A failed flash can stop a PC from starting, so only use the file from {f.guide.vendor}'s own site.</p>
+        </div>
       )}
     </div>
   );

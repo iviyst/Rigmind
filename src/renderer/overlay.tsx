@@ -7,7 +7,17 @@ import type { Telemetry } from "../shared/types";
 
 function Overlay() {
   const [t, setT] = useState<Telemetry | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   useEffect(() => window.rigmindOverlay?.onTelemetry(setT), []);
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const off = (window.rigmindOverlay as any)?.onToast?.((m: string) => {
+      setToast(m);
+      clearTimeout(timer);
+      timer = setTimeout(() => setToast(null), Math.min(15000, 3000 + m.length * 60));
+    });
+    return () => off?.();
+  }, []);
   const hot = (v: number | null | undefined, lim: number) => (v != null && v >= lim ? "hot" : undefined);
   return (
     <div className="ov">
@@ -21,6 +31,7 @@ function Overlay() {
         <span>{t?.gpu ? Math.round(t.gpu.load) : "–"}%</span>
         <span className={hot(t?.gpu?.temp, 83)}>{t?.gpu?.temp != null ? `${t.gpu.temp}°C` : ""}</span>
       </div>
+      {toast && <div className="ov-toast">{toast}</div>}
     </div>
   );
 }

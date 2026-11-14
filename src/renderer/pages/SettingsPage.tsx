@@ -3,6 +3,7 @@ import { api } from "../api";
 import { Setting, Switch, toast } from "../components/Bits";
 import type { Settings, SystemInfo, ToolStatus, UpdateStatus } from "../../shared/types";
 import { fmt } from "../api";
+import { AiEngine, SmartSettings, NotesAndHistory } from "../components/SettingsExtras";
 
 export function SettingsPage({ settings, setSettings }: { settings: Settings; setSettings: (s: Settings) => void }) {
   const [key, setKey] = useState("");
@@ -34,7 +35,9 @@ export function SettingsPage({ settings, setSettings }: { settings: Settings; se
     <div className="page" style={{ maxWidth: 860 }}>
       <h1>Settings</h1>
 
-      <section className="panel">
+      <AiEngine settings={settings} setSettings={setSettings} />
+
+      <section className="panel" style={settings.aiProvider === "local" ? { opacity: 0.75 } : undefined}>
         <h2>Claude</h2>
         <Setting title="Anthropic API key" desc={settings.hasApiKey ? "Encrypted with your Windows account and stored only on this PC. Paste a new key to replace it." : "Create one at platform.claude.com. It's encrypted with your Windows account and never leaves this PC except to call Claude."}>
           <form className="row" onSubmit={async (e) => {
@@ -51,7 +54,7 @@ export function SettingsPage({ settings, setSettings }: { settings: Settings; se
             <button className="btn" type="submit">{key ? "Save key" : settings.hasApiKey ? "Remove" : "Save key"}</button>
           </form>
         </Setting>
-        <p className="muted small" style={{ margin: "0 0 4px" }}>When you use the assistant or session reports, Rigmind sends your PC's stats and session data to Anthropic's API with your key. Nothing goes to Rigmind or anyone else.</p>
+        <p className="muted small" style={{ margin: "0 0 4px" }}>With Claude, the assistant and reports send your PC's stats and session data to Anthropic's API with your key. With Rigmind Local AI, nothing leaves this PC. Nothing ever goes to Rigmind.</p>
         <Setting title="Model" desc="Sonnet is fast and inexpensive. Opus digs deeper on tricky problems.">
           <form className="row" onSubmit={async (e) => { e.preventDefault(); setSettings(await api.saveSettings({ model })); toast("Model saved"); }}>
             <input className="input" style={{ width: 200 }} value={model} onChange={(e) => setModel(e.target.value)} aria-label="Model" list="models" />
@@ -103,6 +106,8 @@ export function SettingsPage({ settings, setSettings }: { settings: Settings; se
         </Setting>
       </section>
 
+      <SmartSettings />
+
       <section className="panel">
         <h2>Sensors and helpers</h2>
         <Setting title="FPS capture (Intel PresentMon)" desc="Reads real frame times from games.">
@@ -142,6 +147,7 @@ export function SettingsPage({ settings, setSettings }: { settings: Settings; se
           </table>
         </section>
       )}
+      <NotesAndHistory />
     </div>
   );
 }

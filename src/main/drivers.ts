@@ -80,6 +80,33 @@ async function nvidiaLatest(): Promise<{ version: string; url: string; date: str
   return { version: String(info.Version), url: decodeURIComponent(String(info.DownloadURL)), date: String(info.ReleaseDateTime ?? "") };
 }
 
+/** Safe, vendor-specific BIOS update steps. Rigmind never flashes firmware itself. */
+function biosGuide(mfr: string): { vendor: string; tool: string; steps: string[] } {
+  const m = mfr.toLowerCase();
+  const [vendor, tool, enter] = m.includes("gigabyte")
+    ? ["Gigabyte", "Q-Flash", "press End during startup, or Delete for the BIOS and choose Q-Flash"]
+    : m.includes("asus")
+    ? ["ASUS", "EZ Flash", "press Delete during startup, go to Advanced Mode > Tool > EZ Flash"]
+    : m.includes("micro-star") || m.includes("msi")
+    ? ["MSI", "M-Flash", "press Delete during startup and choose M-Flash"]
+    : m.includes("asrock")
+    ? ["ASRock", "Instant Flash", "press F6 during startup, or Delete and go to Tool > Instant Flash"]
+    : [mfr || "your board maker", "the BIOS's built-in flash tool", "enter the BIOS (usually Delete or F2 at startup) and find its update tool"];
+  return {
+    vendor,
+    tool,
+    steps: [
+      `Download the newest BIOS for your exact board and revision from ${vendor}'s official support page. Read the notes: some updates can't be rolled back, and some need an in-between version first.`,
+      "Write down or photograph your BIOS settings you changed: XMP/EXPO memory profile, fan curves, boot order, virtualization, overclocks. The update resets them.",
+      "If you use BitLocker, find your recovery key first (account.microsoft.com/devices/recoverykey). A BIOS update can trigger a recovery prompt.",
+      "Extract the download and copy the BIOS file to the root of a USB stick formatted as FAT32.",
+      `Restart and ${enter}. Pick the file from the USB stick and start the update.`,
+      "Don't turn off or restart the PC while it flashes. It can take several minutes and may reboot more than once by itself.",
+      "When it's done, load optimized defaults, then turn your settings back on (XMP/EXPO first). Then open Rigmind and run a stress test.",
+    ],
+  };
+}
+
 function ssdTool(name: string): { tool: string; link: string } {
   const n = name.toLowerCase();
   if (n.includes("samsung")) return { tool: "Samsung Magician", link: search("Samsung Magician download") };
@@ -140,6 +167,7 @@ export async function scanDrivers(progress: (m: string) => void): Promise<Driver
   const firmware: FirmwareItem[] = [];
   const biosAge = ageDays(raw.bios.date);
   const boardName = `${raw.board.mfr ?? ""} ${raw.board.product ?? ""}`.trim();
+  const guide = biosGuide(raw.board.mfr ?? "");
   firmware.push({
     kind: "bios",
     name: boardName || "Motherboard BIOS",
@@ -151,6 +179,7 @@ export async function scanDrivers(progress: (m: string) => void): Promise<Driver
         ? `Your BIOS is ${Math.floor(biosAge / 30)} months old. Newer versions often fix stability, memory compatibility (XMP/EXPO) and CPU microcode issues. Check the support page and update with the board's own tool (e.g. Q-Flash, EZ Flash, M-Flash) from a USB stick.`
         : "BIOS is reasonably recent. Only update if the release notes fix something you need.",
     link: search(`${boardName} BIOS download support`),
+    guide,
   });
   for (const d of arr(raw.disks).filter((d) => /ssd|nvme/i.test(d.media + d.bus))) {
     const t = ssdTool(d.name);

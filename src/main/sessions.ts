@@ -1,7 +1,11 @@
 // Records a gaming session (one point per second + stutter events) and stores it.
-import { readFileSync, writeFileSync, readdirSync, unlinkSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, readdirSync, unlinkSync, existsSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { dataDir } from "./store";
+import { dataDir, load } from "./store";
+import { energy } from "./energy";
+import { netmon } from "./netmon";
+import { hw } from "./hw";
+import { currentDriver } from "./tune";
 import type { SessionDetail, SessionPoint, SessionSummary, StutterEvent, StutterCause, Telemetry, ProcInfo } from "../shared/types";
 
 const dir = () => dataDir("sessions");
@@ -12,6 +16,9 @@ export class SessionRecorder {
   readonly id: string;
   readonly start = Date.now();
   private latest: Telemetry | null = null;
+  private wh = 0;
+  private snaps = 0;
+  private lastSnap = 0;
 
   constructor(public game: string, public exe: string) {
     this.id = new Date(this.start).toISOString().replace(/[:.]/g, "-") + "_" + exe.replace(/[^\w-]/g, "");
@@ -19,6 +26,7 @@ export class SessionRecorder {
 
   add(t: Telemetry) {
     this.latest = t;
+    this.wh += (energy.watts() ?? 0) / 3600;
     this.points.push({
       t: t.t,
       fps: t.fps?.fps ?? null,
@@ -32,6 +40,7 @@ export class SessionRecorder {
       ram: +t.ram.usedGB.toFixed(2),
       gpuClock: t.gpu?.clockMHz ?? null,
       disk: +t.disk.readMBs.toFixed(1),
+      ping: netmon.gamePing(),
     });
   }
 
@@ -44,7 +53,16 @@ export class SessionRecorder {
     const others = procs.filter((p) => p.name.toLowerCase() !== this.exe.toLowerCase());
     const top = [...others].sort((a, b) => b.cpu - a.cpu)[0];
     const { cause, why } = this.classify(t, top);
+    // Optional screenshot of what was on screen at a big hitch (local only, rate limited).
+    let snapshot: string | null = null;
+    if (load().extras.snapshots && ms >= 50 && this.snaps < 40 && Date.now() - this.lastSnap > 15_000 && hw.running) {
+      this.snaps++;
+      this.lastSnap = Date.now();
+      snapshot = `${this.snaps}.jpg`;
+      void hw.snap(join(dir(), this.id + "-snaps", snapshot));
+    }
     this.events.push({
+      snapshot,
       t: Date.now(),
       frametimeMs: +ms.toFixed(1),
       cpuLoad: t.cpu.load,
@@ -104,6 +122,10 @@ export class SessionRecorder {
       avgGpuLoad: avg(this.points.map((p) => p.gpu)) != null ? Math.round(avg(this.points.map((p) => p.gpu))!) : null,
       peakRamGB: max(this.points.map((p) => p.ram)) ?? 0,
       analysis: null,
+      driver: currentDriver(),
+      energyWh: Math.round(this.wh),
+      pingAvg: avg(this.points.map((p) => p.ping ?? null)) != null ? Math.round(avg(this.points.map((p) => p.ping ?? null))!) : null,
+      anomaly: null,
       causes: this.events.reduce<Partial<Record<StutterCause, number>>>((acc, e) => {
         const c = e.cause ?? "unknown";
         acc[c] = (acc[c] ?? 0) + 1;
@@ -145,6 +167,20 @@ export function saveAnalysis(id: string, analysis: string) {
 }
 
 export function deleteSession(id: string) {
-  const f = join(dir(), id.replace(/[\\/]/g, "") + ".json");
+  const safe = id.replace(/[\\/]/g, "");
+  const f = join(dir(), safe + ".json");
   if (existsSync(f)) unlinkSync(f);
+  rmSync(join(dir(), safe + "-snaps"), { recursive: true, force: true });
+}
+
+export function saveSessionField(id: string, patch: Partial<SessionDetail>) {
+  const s = getSession(id);
+  if (!s) return;
+  writeFileSync(join(dir(), s.id + ".json"), JSON.stringify({ ...s, ...patch }));
+}
+
+/** A stutter snapshot as a data URL for the UI. */
+export function getSnapshot(sessionId: string, file: string): string | null {
+  const p = join(dir(), sessionId.replace(/[\\/]/g, "") + "-snaps", file.replace(/[\\/]/g, ""));
+  return existsSync(p) ? "data:image/jpeg;base64," + readFileSync(p).toString("base64") : null;
 }
