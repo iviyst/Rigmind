@@ -1,4 +1,5 @@
 # Rigmind
+<<<<<<< HEAD
 
 AI-powered performance companion for Windows gaming PCs. Live monitoring, automatic Game Boost, frame-time stutter analysis explained by Claude, before/after fix testing, fan and RGB control, and one-click driver updates.
 
@@ -99,3 +100,6 @@ src/renderer/    React UI (mock.ts powers the browser preview)
 src/shared/      types shared by both
 .github/         release build, secret scan, Dependabot
 ```
+=======
+AI-powered performance companion for Windows gaming PCs. Live monitoring, automatic Game Boost, frame-time stutter analysis explained by Claude, before/after fix testing, fan and RGB control, and one-click driver updates.
+>>>>>>> 85d645bdb9f28e7b0f3dcfc9ccf0004a8c13e1e5
