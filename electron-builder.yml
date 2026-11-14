@@ -1,0 +1,28 @@
+appId: com.chris.rigmind
+productName: Rigmind
+directories:
+  output: release
+files:
+  - dist/**
+  - dist-electron/**
+  - package.json
+extraResources:
+  - from: resources
+    to: resources
+win:
+  target: nsis
+  icon: resources/icon.png
+  # Rigmind needs admin to read frame times (PresentMon/ETW), control fans, change priorities of
+  # elevated games, pause background apps and install drivers.
+  requestedExecutionLevel: requireAdministrator
+nsis:
+  oneClick: false
+  perMachine: true
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+# Auto-update: Rigmind checks GitHub Releases of this repo. Releases live at github.com/iviyst/Rigmind.
+publish:
+  provider: github
+  owner: iviyst
+  repo: Rigmind
+  releaseType: release

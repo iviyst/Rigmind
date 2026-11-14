@@ -1,0 +1,29 @@
+# Dependencies and build output
+node_modules/
+dist/
+dist-electron/
+release/
+resources/rigmind-hw/
+hw/bin/
+hw/obj/
+
+# Secrets: never commit these
+.env
+.env.*
+*.pem
+*.key
+*.pfx
+*.p12
+*.cer
+*.crt
+*.snk
+electron-builder.env
+secrets.*
+**/settings.json
+
+# Local / OS
+*.log
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

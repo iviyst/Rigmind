@@ -1,0 +1,38 @@
+# Builds the Windows installer and publishes it to GitHub Releases when you push a version tag:
+#   npm version patch   (or minor / major)
+#   git push --follow-tags
+# Uses the token GitHub creates for this run. No personal token is stored anywhere.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build hardware helper
+        run: npm run build:hw
+
+      - name: Build and publish installer
+        run: npm run release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
