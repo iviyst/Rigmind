@@ -34,7 +34,7 @@
     "electron-builder": "latest",
     "react": "^19",
     "react-dom": "^19",
-    "typescript": "^5",
+    "typescript": "^7",
     "vite": "latest",
     "wait-on": "latest"
   }
