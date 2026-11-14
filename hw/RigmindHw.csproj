@@ -21,7 +21,7 @@
     <!-- 0.9.5+ uses the PawnIO driver instead of WinRing0 (which Defender flags). -->
     <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.*" />
     <!-- Offline speech recognition and text-to-speech for the voice copilot. -->
-    <PackageReference Include="System.Speech" Version="8.0.0" />
+    <PackageReference Include="System.Speech" Version="11.0.0" />
   </ItemGroup>
 
 </Project>
