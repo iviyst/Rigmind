@@ -25,3 +25,7 @@ export const BrandMark = ({ className }: { className?: string }) => (
     <circle cx="12" cy="12" r="2.4" fill="var(--ink)" />
   </svg>
 );
+export const IconMoon = () => (<svg {...base}><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" /></svg>);
+export const IconWork = () => (<svg {...base}><rect x="3" y="7" width="18" height="13" rx="2" /><path d="M9 7V5a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v2M3 12.5h18" /></svg>);
+export const IconDisk = () => (<svg {...base}><ellipse cx="12" cy="6" rx="8" ry="3" /><path d="M4 6v12c0 1.7 3.6 3 8 3s8 -1.3 8 -3V6M4 12c0 1.7 3.6 3 8 3s8 -1.3 8 -3" /></svg>);
+export const IconPrinter = () => (<svg {...base}><path d="M7 9V3h10v6M7 17H5a2 2 0 0 1 -2 -2v-4a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v4a2 2 0 0 1 -2 2h-2" /><rect x="7" y="14" width="10" height="7" rx="1" /></svg>);

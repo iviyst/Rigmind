@@ -21,13 +21,24 @@ The few times Rigmind connects to the internet, it talks directly to the service
 | Installing helpers you choose | winget / the tool's official site | Only when you click Install. |
 | Phone remote (off by default) | Your home network only | Live stats to your own phone, protected by a secret link. |
 | Discord status (off by default) | The Discord app on your PC | Your current game and FPS. |
+| Threat list updates (every 4 hours) | GitHub ([iviyst/rigmind-intel](https://github.com/iviyst/rigmind-intel) Releases) | A download request only. Files are checked against the list **on your PC**; no file, hash or browsing data is sent. |
+| Ready at night | Steam, winget, Windows Update and NVIDIA, as above | The same update requests those apps make themselves. |
+| Printer Finder | Your local network only (Bonjour / mDNS) | A "which printers are here?" question to devices on your network. |
 
-Security scans use Microsoft Defender on your PC; Rigmind never uploads your files.
+Malware detection and quarantine are done by **your own antivirus** (Microsoft Defender or the one you installed). Rigmind adds a second opinion from open threat lists and ClamAV, and never uploads your files.
+
+**Browser Guard** reads extension manifests and browser settings files on your PC. It never opens your history, cookies, saved passwords or page content.
 
 ## Features
 
+**New in 1.3:** the installer asks what the PC is for (**Gaming**, **Work** or **Both**) and Rigmind shows the tools that fit. In Both mode it switches on its own: a game turns on gaming tools, a call turns on Meeting Mode.
+
 | Page | |
 |---|---|
+| **Ready to Play / Ready to Work** | Overnight, with the screen off and the sound muted: Steam patches, app updates through winget, Windows updates with a restore point, GPU driver download (or install), shader warm-up for your most-played games, a Defender scan and SSD TRIM. Then it puts everything back and sleeps again. Any keyboard or mouse input stops it within 2 seconds. Never restarts over unsaved work. The first night is a practice run, and every morning shows what it did and the waiting it saved. |
+| **Work** | **App Boost** gives exports, builds, renders and big recalculations priority, pauses cloud sync and keeps the PC awake, then reports the job time against your average. **Meeting Mode** starts when a call app uses your mic: it pauses sync and Windows Update, holds notifications, and warns early about weak Wi-Fi, jitter or a maxed-out CPU. **Why is it slow?** names the cause in plain words with a fix. |
+| **Space and memory** | A drive map (click to drill in), the biggest files, and space you can get back: old Windows Update files, Windows.old, old GPU drivers, caches, games you haven't played in 90 days, big old downloads and duplicates. RAM by app, leak watch, and startup apps with on/off switches. |
+| **Printers** | Finds every printer on your network with its location, adds one in a click with Windows' built-in driver, prints an identify page, and fixes "Offline" (printer moved to a new address), stuck jobs and a default printer that keeps changing. |
 | **Live** | CPU and GPU load gauges, temperatures, clocks, GPU power, FPS and 1% lows while you play, RAM, VRAM, disk and network use, plus the apps using the most CPU. |
 | **Game Boost** | Detects games from Steam, Epic, Xbox, Battle.net, EA, Ubisoft, Riot, GOG, Rockstar and Roblox. While you play it applies the **game's profile**: priority, power plan, pinning to the cache cores on dual-CCD X3D Ryzens, pausing background apps, fan profile and lighting color. Everything is restored when the game closes. Rigmind learns which apps cause stutters and suggests pausing them. |
 | **Before/after tests** | Measures FPS before a change, with it, and without it again, about 40 seconds each, while you play. The change is kept only if it measurably helps; otherwise Rigmind undoes it. |
@@ -37,9 +48,9 @@ Security scans use Microsoft Defender on your PC; Rigmind never uploads your fil
 | **Drivers** | NVIDIA driver one-click update; Windows Update drivers with a restore point; BIOS and SSD firmware checks. **Firmware is never flashed automatically.** |
 | **Assistant** | Chat about your PC with Claude or the free Rigmind Local AI. Fixes appear as **Apply** or **Apply and test** buttons, from a fixed list of safe actions. Rig notes let it remember facts about your PC between chats. |
 | **Game Coach** | Optimizes any game's settings for your hardware and playstyle by reading its own config file. Sensitivity converter (cm/360, eDPI), aim warm-up trainer, and CS2/Dota 2 match recaps lined up with your FPS and ping. Fair play only: no aim assist. |
-| **Health** | Daily AI checkup. Crash Detective (crashes, GPU driver resets, hardware errors, blue screens, sudden shutdowns) with a flight recorder of the minutes before each one. Temperature trends, boot time and what slows it, driver impact on each game, a built-in CPU+GPU stress test, and an undervolting coach. |
-| **Security** | Microsoft Defender status, scans, threats and quarantine, explained in plain English. Intrusion watch: new apps accepting connections, new services, startup tasks and admin accounts, failed sign-ins, new devices on your network, and an exposure check (firewall, Remote Desktop, sharing, SMBv1). |
-| **Tune** | Display Doctor (monitors stuck at 60 Hz), ping/jitter/loss to your game's servers, power use and cost, shader cache cleanup, holding Windows Update during games, stutter snapshots. |
+| **Health** | Backup check, laptop battery wear, Hang detective (what was happening each time an app froze). Daily AI checkup. Crash Detective (crashes, GPU driver resets, hardware errors, blue screens, sudden shutdowns) with a flight recorder of the minutes before each one. Temperature trends, boot time and what slows it, driver impact on each game, a built-in CPU+GPU stress test, and an undervolting coach. |
+| **Security** | Your antivirus's status, scans, threats and quarantine, explained in plain English. **Browser Guard** scores every extension in Chrome, Edge, Brave and Firefox and catches hijacked search, proxies, DNS, hosts files and shortcuts. **Threat lists** check your downloads and startup programs against open malware lists and hand anything suspicious to your antivirus. Intrusion watch: new apps accepting connections, new services, startup tasks and admin accounts, failed sign-ins, new devices on your network, and an exposure check (firewall, Remote Desktop, sharing, SMBv1). |
+| **Tune** | WSL memory cap, build cache cleanup and "who's using this port?" for developers. Display Doctor (monitors stuck at 60 Hz), ping/jitter/loss to your game's servers, power use and cost, shader cache cleanup, holding Windows Update during games, stutter snapshots. |
 | **Automations** | "When I start Valorant, close Chrome and set fans to performance." Plain English becomes a rule built from a fixed set of safe steps. |
 | **More** | Voice copilot (hotkey, offline speech recognition), phone remote, rig card image, Discord status, live rig diagram, game-reactive and screen-matching RGB, Autopilot for low-risk fixes, change history with undo, BIOS Update Assistant. |
 
@@ -56,6 +67,21 @@ Security scans use Microsoft Defender on your PC; Rigmind never uploads your fil
    - **Lighting:** install OpenRGB, then close iCUE, Armoury Crate and other brand RGB apps.
 
 `npm run preview:ui` opens the interface in a browser with sample data. It doesn't touch your PC.
+
+### Installing for someone else
+
+The installer asks Gaming, Work or Both. For a silent install, pass the mode: `"Rigmind Setup 1.3.0.exe" /S /MODE=Work`. Updates never ask again or change the choice.
+
+### Threat list feed
+
+The threat list is built by a separate public repo, `iviyst/rigmind-intel` (its files ship alongside this release). Set it up once:
+
+1. Create the repo and push the `rigmind-intel` files.
+2. Add a free abuse.ch Auth-Key as the Actions secret `ABUSECH_KEY`.
+3. Run `node make-keys.mjs`. Put the **private** key in the Actions secret `INTEL_SIGNING_KEY` and paste the **public** key into `src/main/intel-key.ts`.
+4. Run the **Build threat list** workflow once.
+
+Until the public key is pasted in, Rigmind shows "The threat list isn't connected yet" and still uses your antivirus and ClamAV.
 
 ## Releasing an update
 

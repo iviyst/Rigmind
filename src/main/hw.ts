@@ -118,6 +118,31 @@ class HardwareHelper extends EventEmitter {
   say(text: string) {
     this.send({ cmd: "say", text });
   }
+  // ---- 1.3: night engine, hashing, disk map ----
+  /** Milliseconds since the last keyboard or mouse input, or null if the helper isn't running. */
+  async idleMs(): Promise<number | null> {
+    const r = await this.request<{ ms: number }>({ cmd: "idle" }, 2000);
+    return r && r.ms >= 0 ? r.ms : null;
+  }
+  keepAwake(on: boolean) {
+    this.send({ cmd: "awake", on });
+  }
+  monitorOff() {
+    this.send({ cmd: "monitoroff" });
+  }
+  sleepNow() {
+    return this.request<{ ok: boolean }>({ cmd: "sleep" }, 5000);
+  }
+  /** Mute (or unmute) the default speakers. Returns the state before the change. */
+  mute(on: boolean, volume?: number) {
+    return this.request<{ ok: boolean; wasMuted: boolean; volume: number; msg?: string }>({ cmd: "mute", on, ...(volume != null ? { volume } : {}) }, 5000);
+  }
+  hashFiles(paths: string[]) {
+    return this.request<{ list: { path: string; sha256: string }[] }>({ cmd: "hash", paths }, 10 * 60_000).then((r) => r?.list ?? []);
+  }
+  diskScan(path: string) {
+    return this.request<{ root: any; bigFiles: any[]; seconds: number }>({ cmd: "diskscan", path }, 30 * 60_000);
+  }
   cpuPower(): number | null {
     const c = this.find((h, s) => h.type === "Cpu" && s.type === "Power" && /package/i.test(s.name));
     return c.length ? c[0].v : null;
@@ -145,6 +170,8 @@ class HardwareHelper extends EventEmitter {
       this.emit("status", this.status());
     } else if (m.type === "error") {
       this.error = m.msg;
+    } else if (m.type === "diskprogress") {
+      this.emit("diskprogress", { files: m.files, bytes: m.bytes });
     } else if (m.type === "ping") {
       this.emit("ping", m.r as { host: string; ms: number | null }[]);
     }

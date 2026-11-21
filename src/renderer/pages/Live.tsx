@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
+import { WhySlowPanel } from "../components/WhySlowPanel";
 import { api, fmt, tempTone } from "../api";
 import { Gauge } from "../components/Gauge";
 import { Sparkline } from "../components/Charts";
 import type { GameState, ProcInfo, Telemetry, NetStatus, EnergySummary } from "../../shared/types";
 import { RigCardButton } from "../components/RigCard";
 
-export function Live({ history, game, onAsk }: { history: Telemetry[]; game: GameState; onAsk: (q: string) => void }) {
+export function Live({ history, game, onAsk, go }: { history: Telemetry[]; game: GameState; onAsk: (q: string) => void; go?: (page: string) => void }) {
   const t = history[history.length - 1];
   const [procs, setProcs] = useState<ProcInfo[]>([]);
   const [cpuName, setCpuName] = useState<string>();
@@ -129,6 +130,7 @@ export function Live({ history, game, onAsk }: { history: Telemetry[]; game: Gam
           </tbody>
         </table>
       </section>
+      {go && <WhySlowPanel go={go} />}
     </div>
   );
 }

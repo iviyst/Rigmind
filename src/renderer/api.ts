@@ -15,6 +15,7 @@ export const fmt = {
   pct: (v: number | null | undefined) => (v == null ? "–" : Math.round(v).toString()),
   temp: (v: number | null | undefined) => (v == null ? "–" : `${Math.round(v)}°`),
   gb: (v: number) => v.toFixed(1),
+  bytes: (b: number) => (b >= 1024 ** 4 ? `${(b / 1024 ** 4).toFixed(2)} TB` : b >= 1024 ** 3 ? `${(b / 1024 ** 3).toFixed(1)} GB` : b >= 1024 ** 2 ? `${Math.round(b / 1024 ** 2)} MB` : `${Math.max(0, Math.round(b / 1024))} KB`),
   dur: (ms: number) => {
     const m = Math.round(ms / 60000);
     return m >= 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m} min`;

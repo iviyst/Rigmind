@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import { Setting, Switch, toast } from "../components/Bits";
-import type { Settings, SystemInfo, ToolStatus, UpdateStatus } from "../../shared/types";
+import type { ModeState, Settings, SystemInfo, ToolStatus, UpdateStatus, WorkMode } from "../../shared/types";
 import { fmt } from "../api";
 import { AiEngine, SmartSettings, NotesAndHistory } from "../components/SettingsExtras";
 
-export function SettingsPage({ settings, setSettings }: { settings: Settings; setSettings: (s: Settings) => void }) {
+export function SettingsPage({ settings, setSettings, mode, setMode }: { settings: Settings; setSettings: (s: Settings) => void; mode: ModeState | null; setMode: (m: ModeState) => void }) {
   const [key, setKey] = useState("");
   const [model, setModel] = useState(settings.model);
   const [tools, setTools] = useState<ToolStatus | null>(null);
@@ -34,6 +34,24 @@ export function SettingsPage({ settings, setSettings }: { settings: Settings; se
   return (
     <div className="page" style={{ maxWidth: 860 }}>
       <h1>Settings</h1>
+
+      <section className="panel">
+        <h2>What is this PC for?</h2>
+        <p className="sub small">Rigmind shows the tools that fit. {mode?.chosenAt === "installer" ? "You picked this when you installed Rigmind." : ""}</p>
+        <div className="mode-cards" style={{ marginTop: 10 }}>
+          {([
+            ["gaming", "Gaming", "Game Boost, Game Coach, overnight game updates and shader warm-up, fans and RGB."],
+            ["work", "Work", "App Boost, Meeting Mode, overnight app updates, printers and backup checks."],
+            ["both", "Both", "Everything. A game turns on gaming tools; a call turns on Meeting Mode."],
+          ] as [WorkMode, string, string][]).map(([id, name, desc]) => (
+            <button key={id} aria-pressed={mode?.mode === id} onClick={async () => { setMode(await api.setMode(id)); toast(`Switched to ${name}.`); }}>
+              <b>{name}</b>
+              <span className="small">{desc}</span>
+            </button>
+          ))}
+        </div>
+        {mode?.managed && <p className="muted small" style={{ marginBottom: 0 }}>This PC is managed by your company's IT. Rigmind leaves Windows Update, drivers, browser policies and IT printers to them.</p>}
+      </section>
 
       <AiEngine settings={settings} setSettings={setSettings} />
 

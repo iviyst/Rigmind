@@ -21,6 +21,8 @@ class GameBoost extends EventEmitter {
   private recorder: SessionRecorder | null = null;
   private paused: { pid: number; name: string }[] = [];
   private busy = false;
+  /** Set by Ready to Play while it launches games unattended to warm their shaders. */
+  suppressed = false;
 
   async init() {
     // If Rigmind crashed mid-game last time, resume anything it paused.
@@ -45,7 +47,7 @@ class GameBoost extends EventEmitter {
   }
 
   private onProcs(procs: ProcInfo[]) {
-    if (this.busy) return;
+    if (this.busy || (this.suppressed && !this.state.active)) return;
     if (this.state.active) {
       const stillRunning = procs.some((p) => p.pid === this.state.pid);
       if (stillRunning || this.manual) {

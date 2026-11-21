@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { api, fmt } from "../api";
 import { Markdown, Thinking, toast } from "../components/Bits";
 import { IconShield } from "../components/Icons";
+import { BrowserGuardPanel } from "../components/BrowserGuardPanel";
+import { ThreatsPanel } from "../components/ThreatsPanel";
 import type { SecurityState, Settings } from "../../shared/types";
 
 export function Security({ settings }: { settings: Settings }) {
@@ -111,6 +113,9 @@ export function Security({ settings }: { settings: Settings }) {
         </section>
       )}
 
+      <ThreatsPanel />
+      <BrowserGuardPanel />
+
       <div className="grid-2">
         <section className="panel">
           <h2>Exposure check</h2>
@@ -163,7 +168,7 @@ export function Security({ settings }: { settings: Settings }) {
           </tbody>
         </table>
       </section>
-      <p className="muted small">Malware detection uses Microsoft Defender's engine. Rigmind never uploads your files anywhere. If you use another antivirus, Defender steps aside and Rigmind shows its name above.</p>
+      <p className="muted small">Malware detection and quarantine are done by your antivirus (Microsoft Defender or the one you installed). Rigmind adds a second opinion from open threat lists and never uploads your files anywhere.</p>
     </div>
   );
 }

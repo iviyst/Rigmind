@@ -1,3 +1,5 @@
+import type { Api13 } from "./types13";
+export * from "./types13";
 // Types shared between the Electron main process and the React UI.
 
 export interface ProcInfo {
@@ -399,7 +401,7 @@ export interface LocalAiStatus {
   pulling: { model: string; pct: number; status: string } | null;
 }
 
-export interface RigmindApi {
+export interface RigmindApi extends Api13 {
   localAiStatus(): Promise<LocalAiStatus>;
   localAiSetup(model?: string): Promise<{ ok: boolean; message: string }>;
   onLocalAi(cb: (s: LocalAiStatus) => void): () => void;

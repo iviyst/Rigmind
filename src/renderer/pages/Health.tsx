@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { WorkHealthPanel } from "../components/WorkHealthPanel";
 import { api, fmt } from "../api";
 import { Markdown, Thinking, toast } from "../components/Bits";
 import { LineChart, Legend } from "../components/Charts";
@@ -13,7 +14,7 @@ const KIND_LABEL: Record<Incident["kind"], string> = {
   power_loss: "Sudden shutdown",
 };
 
-export function Health({ settings }: { settings: Settings }) {
+export function Health({ settings, laptop = false }: { settings: Settings; laptop?: boolean }) {
   const [checkups, setCheckups] = useState<Checkup[]>([]);
   const [checking, setChecking] = useState(false);
   const [inc, setInc] = useState<Incident[]>([]);
@@ -174,6 +175,7 @@ export function Health({ settings }: { settings: Settings }) {
       )}
 
       <StressAndCoach settings={settings} />
+      <WorkHealthPanel laptop={laptop} />
     </div>
   );
 }

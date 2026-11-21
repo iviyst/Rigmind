@@ -1,4 +1,5 @@
 // Fake data so the UI can be previewed in a normal browser (npm run preview:ui).
+import { mock13 } from "./mock13";
 import type { ExtrasSettings, Incident, SecurityState, Rule, Checkup, RigNote, ChangeEntry, MatchRecap, StressResult, NetStatus, RigmindApi, Telemetry, GameState, SessionDetail, Settings, DriverScan, ChatMessage, HwStatus, FanSettings, FanRuntime, RgbSettings, RgbStatus, GameProfile, TestRun, UpdateStatus } from "../shared/types";
 
 const listeners: Record<string, Set<(v: any) => void>> = {};
@@ -342,4 +343,4 @@ const v12 = {
   saveAimScore: async (mode: string, score: number, avgMs: number) => (extras = { ...extras, aim: { ...extras.aim, scores: [{ t: Date.now(), mode, score, avgMs }, ...extras.aim.scores] } }),
 };
 
-export const mockApi: RigmindApi = { ...base, ...v12 } as RigmindApi;
+export const mockApi: RigmindApi = { ...base, ...v12, ...mock13 } as RigmindApi;

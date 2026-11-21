@@ -45,6 +45,8 @@ class FanEngine extends EventEmitter {
   private calibStep = "";
   inGame = false;
   failsafe: string | null = null;
+  /** Ready to Play's quiet night: use the quiet curve while the PC works unattended. */
+  night = false;
 
   init() {
     hw.on("sample", () => this.tick());
@@ -84,6 +86,7 @@ class FanEngine extends EventEmitter {
 
   currentProfile(): FanProfileName {
     const s = this.settings();
+    if (this.night && !this.inGame) return "quiet";
     return this.inGame ? this.gameProfile ?? s.gameProfile : s.desktopProfile;
   }
 

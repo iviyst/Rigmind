@@ -2,7 +2,7 @@
 import { app, safeStorage } from "electron";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
-import type { Settings, BoostSettings, FanSettings, RgbSettings, GameProfile, ExtrasSettings } from "../shared/types";
+import type { Settings, BoostSettings, FanSettings, RgbSettings, GameProfile, ExtrasSettings, ReadySettings, WorkApp, WorkMode } from "../shared/types";
 import { randomBytes } from "node:crypto";
 
 interface Stored {
@@ -21,7 +21,35 @@ interface Stored {
   profiles: Record<string, GameProfile>; // key = exe name, lower case
   extras: ExtrasSettings;
   lastGpuDriver: string | null;
+  // ---- 1.3 ----
+  modeOverride: WorkMode | null; // set when the user changes the mode inside the app
+  ready: ReadySettings;
+  appBoost: { enabled: boolean; custom: WorkApp[] };
+  meeting: { enabled: boolean; dnd: boolean };
+  intelKeyPin: string | null; // optional: pin a different intel signing key (advanced)
 }
+
+export const readyDefaults: ReadySettings = {
+  enabled: false,
+  dryRunDone: false,
+  from: "03:00",
+  to: "06:00",
+  weekdaysOnly: false,
+  gameUpdates: true,
+  appUpdates: true,
+  warmup: "top5",
+  windowsUpdates: true,
+  gpuDriver: "download",
+  restarts: "safe",
+  prewarm: false,
+  fanCapPct: 55,
+  downloadCapGB: 0,
+  phoneReport: true,
+  gpuLimitC: 83,
+  cpuLimitC: 90,
+  alwaysWarm: [],
+  neverTouch: [],
+};
 
 const defaults: Stored = {
   apiKeyEnc: null,
@@ -47,6 +75,11 @@ const defaults: Stored = {
   },
   profiles: {},
   lastGpuDriver: null,
+  modeOverride: null,
+  ready: readyDefaults,
+  appBoost: { enabled: true, custom: [] },
+  meeting: { enabled: true, dnd: false },
+  intelKeyPin: null,
   extras: {
     holdWindowsUpdate: true,
     autoClearShaders: true,
@@ -97,6 +130,9 @@ export function load(): Stored {
         rgb: { ...defaults.rgb, ...(raw.rgb ?? {}), schedule: { ...defaults.rgb.schedule, ...(raw.rgb?.schedule ?? {}) } },
         profiles: raw.profiles ?? {},
         extras: { ...defaults.extras, ...(raw.extras ?? {}) },
+        ready: { ...readyDefaults, ...(raw.ready ?? {}) },
+        appBoost: { ...defaults.appBoost, ...(raw.appBoost ?? {}) },
+        meeting: { ...defaults.meeting, ...(raw.meeting ?? {}) },
       };
     }
   } catch {
@@ -117,6 +153,9 @@ export function save(patch: Partial<Stored>): Stored {
     fans: { ...cur.fans, ...(patch.fans ?? {}) },
     rgb: { ...cur.rgb, ...(patch.rgb ?? {}) },
     extras: { ...cur.extras, ...(patch.extras ?? {}) },
+    ready: { ...cur.ready, ...(patch.ready ?? {}) },
+    appBoost: { ...cur.appBoost, ...(patch.appBoost ?? {}) },
+    meeting: { ...cur.meeting, ...(patch.meeting ?? {}) },
   };
   mkdirSync(dir(), { recursive: true });
   writeFileSync(file(), JSON.stringify(cache, null, 2));

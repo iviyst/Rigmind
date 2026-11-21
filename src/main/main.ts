@@ -35,6 +35,16 @@ import { gsi } from "./gsi";
 import { voice } from "./voice";
 import { remote } from "./remote";
 import { discord } from "./discord";
+import { mode } from "./mode";
+import { ready } from "./ready";
+import { appBoost } from "./appboost";
+import { meeting } from "./meeting";
+import { browserGuard } from "./browserguard";
+import { intel } from "./intel";
+import { space } from "./space";
+import { printers } from "./printers";
+import * as work from "./worktools";
+import type { ActiveProfile, ReadySettings, WorkMode } from "../shared/types";
 import { app as electronApp } from "electron";
 import { writeFileSync as writeFile } from "node:fs";
 import type { ChatMessage, ProposedAction, SessionDetail, Settings, GameProfile, FanSettings, RgbSettings, TestChangeKind, ExtrasSettings, MatchRecap } from "../shared/types";
@@ -323,22 +333,86 @@ function registerIpc() {
   ipcMain.handle("drivers:scan", () => scanDrivers());
   ipcMain.handle("drivers:installWu", (_e, ids: string[]) => drivers.installWindowsUpdate(ids, (m) => mainWin?.webContents.send("drivers:progress", m)));
   ipcMain.handle("drivers:installNvidia", () => drivers.installNvidia((m) => mainWin?.webContents.send("drivers:progress", m)));
+  // ---- 1.3 ----
+  ipcMain.handle("mode:get", () => mode.state());
+  ipcMain.handle("mode:set", (_e, m: WorkMode) => mode.setMode(m));
+  ipcMain.handle("mode:override", (_e, p: ActiveProfile | null) => mode.setOverride(["game", "call", "work", "normal"].includes(p as string) ? p : null));
+  ipcMain.handle("ready:state", () => ready.state());
+  ipcMain.handle("ready:save", (_e, patch: Partial<ReadySettings>) => ready.saveSettings(patch ?? {}));
+  ipcMain.handle("ready:run", (_e, dry: boolean) => ready.run("manual", !!dry));
+  ipcMain.handle("ready:cancel", () => ready.cancel());
+  ipcMain.handle("ready:testWake", () => ready.testWake());
+  ipcMain.handle("appboost:state", () => appBoost.state());
+  ipcMain.handle("appboost:save", (_e, patch) => appBoost.save({ enabled: typeof patch?.enabled === "boolean" ? patch.enabled : undefined, addExe: typeof patch?.addExe === "string" ? patch.addExe : undefined, removeExe: typeof patch?.removeExe === "string" ? patch.removeExe : undefined }));
+  ipcMain.handle("meeting:state", () => meeting.state());
+  ipcMain.handle("meeting:save", (_e, patch) => meeting.save({ enabled: typeof patch?.enabled === "boolean" ? patch.enabled : undefined, dnd: typeof patch?.dnd === "boolean" ? patch.dnd : undefined }));
+  ipcMain.handle("meeting:check", () => meeting.check());
+  ipcMain.handle("browser:state", () => browserGuard.state());
+  ipcMain.handle("browser:scan", () => browserGuard.scan());
+  ipcMain.handle("browser:block", (_e, key: string) => browserGuard.block(String(key)));
+  ipcMain.handle("browser:open", (_e, key: string) => browserGuard.open(String(key)));
+  ipcMain.handle("browser:fix", (_e, id: string) => browserGuard.fix(String(id)));
+  ipcMain.handle("threats:state", () => intel.state());
+  ipcMain.handle("threats:scan", () => intel.scan());
+  ipcMain.handle("threats:act", (_e, id: string, action: string) =>
+    ["hand_off", "hold", "restore", "ignore", "report"].includes(action) ? intel.act(String(id), action as any) : { ok: false, message: "Unknown action" }
+  );
+  ipcMain.handle("threats:update", () => intel.update());
+  ipcMain.handle("space:disks", () => space.disks());
+  ipcMain.handle("space:scan", (_e, drive: string) => space.scan(String(drive)));
+  ipcMain.handle("space:hogs", () => space.findHogs());
+  ipcMain.handle("space:preview", (_e, id: string) => space.preview(String(id)));
+  ipcMain.handle("space:clean", (_e, id: string) => space.clean(String(id)));
+  ipcMain.handle("space:open", (_e, p: string) => {
+    if (space.openable(p)) shell.showItemInFolder(p);
+  });
+  ipcMain.handle("mem:view", () => space.memory());
+  ipcMain.handle("mem:act", (_e, action: string, appName: string) => space.memoryAct(action === "restart" ? "restart" : "close", String(appName)));
+  ipcMain.handle("startup:toggle", (_e, id: string, on: boolean) => space.setStartup(String(id), !!on));
+  ipcMain.handle("printers:list", (_e, refresh?: boolean) => printers.list_(!!refresh));
+  ipcMain.handle("printers:add", (_e, key: string) => printers.add(String(key)));
+  ipcMain.handle("printers:identify", (_e, key: string) => printers.identify(String(key)));
+  ipcMain.handle("printers:fix", (_e, key: string, fix: string) =>
+    ["queue", "default", "port", "remove"].includes(fix) ? printers.fix(String(key), fix as any) : { ok: false, message: "Unknown fix" }
+  );
+  ipcMain.handle("work:whyslow", () => work.whySlow());
+  ipcMain.handle("work:whyslowfix", (_e, action: string, target?: string) => work.whySlowFix(String(action), target == null ? undefined : String(target)));
+  ipcMain.handle("work:hangs", () => work.hangPatterns());
+  ipcMain.handle("work:battery", () => work.battery());
+  ipcMain.handle("work:backup", () => work.backupStatus());
+  ipcMain.handle("work:dev", () => work.devInfo());
+  ipcMain.handle("work:devact", (_e, action: string, arg: string) => (action === "wslcap" || action === "cleancache" ? work.devAct(action, String(arg)) : { ok: false, message: "Unknown action" }));
+  ipcMain.handle("work:ports", () => work.portOwners());
   ipcMain.handle("open:external", (_e, url: string) => {
-    if (typeof url === "string" && /^(https:\/\/|ms-settings:)/.test(url)) return shell.openExternal(url);
+    if (typeof url !== "string") return;
+    if (/^(https:\/\/|ms-settings:)/.test(url)) return shell.openExternal(url);
+    // Printers' own web pages are plain http, but only on the local network.
+    try {
+      const u = new URL(url);
+      if (u.protocol === "http:" && /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)|\.local$/i.test(u.hostname)) return shell.openExternal(url);
+    } catch {
+      /* not a URL */
+    }
   });
 }
 
 // ---------- App lifecycle ----------
 if (!app.requestSingleInstanceLock()) app.quit();
 else {
-  app.on("second-instance", () => showMain());
+  app.on("second-instance", (_e, argv) => {
+    // The scheduled task starts Rigmind with --ready; if Rigmind is already running, the running copy gets it.
+    if (argv.includes("--ready")) void ready.run("night");
+    else if (argv.includes("--wake-test")) notify("Wake test worked", "The PC woke on schedule, so Ready to Play can run at night.", "ready");
+    else showMain();
+  });
   app.setAppUserModelId("com.chris.rigmind");
 
   app.whenReady().then(async () => {
     // No camera, mic, notifications-from-web, etc. The UI never needs browser permissions.
     session.defaultSession.setPermissionRequestHandler((_wc, _perm, cb) => cb(false));
     registerIpc();
-    createWindow(!process.argv.includes("--hidden"));
+    const quietStart = process.argv.includes("--hidden") || process.argv.includes("--ready") || process.argv.includes("--wake-test");
+    createWindow(!quietStart);
     buildTray();
     await boost.init();
     telemetry.start();
@@ -359,6 +433,37 @@ else {
     voice.apply();
     remote.apply();
     discord.apply();
+    // ---- 1.3 ----
+    const send13 = (ch: string) => (v: unknown) => mainWin?.webContents.send(ch, v);
+    void mode.init();
+    appBoost.init();
+    meeting.init();
+    intel.init();
+    browserGuard.init();
+    space.init();
+    printers.init();
+    work.initHangDetective();
+    ready.init();
+    if (process.argv.includes("--ready")) setTimeout(() => void ready.run("night"), 20_000); // give sensors and RGB time to connect
+    if (process.argv.includes("--wake-test")) notify("Wake test worked", "The PC woke on schedule, so Ready to Play can run at night.", "ready");
+    const pushMode = () => mode.update({ game: boost.state.active ? boost.state.game : null, call: meeting.state().inCall ? meeting.state().app : null, work: appBoost.state().active ? `${appBoost.state().active!.app} working` : null });
+    boost.on("state", pushMode);
+    meeting.on("state", pushMode);
+    appBoost.on("state", pushMode);
+    mode.on("state", send13("mode:state"));
+    ready.on("state", send13("ready:state"));
+    ready.on("note", (m: string) => notify("Rigmind Ready", m, "ready"));
+    ready.on("report", (r) => {
+      const line = ready.summaryLine();
+      if (line && r.trigger !== "manual") notify(r.dryRun ? "Ready practice run finished" : "Your PC is ready", line, "ready");
+    });
+    appBoost.on("state", send13("appboost:state"));
+    appBoost.on("job", (j) => j.seconds >= 60 && notify(`${j.app} finished`, `Took ${Math.round(j.seconds / 60)} min${j.vsAvgPct != null ? `, ${Math.abs(j.vsAvgPct)}% ${j.vsAvgPct <= 0 ? "faster" : "slower"} than your average` : ""}.`, "work"));
+    meeting.on("state", send13("meeting:state"));
+    meeting.on("warning", (m: string) => !overlayToast(m) && notify("Call quality", m, "work"));
+    intel.on("state", send13("threats:state"));
+    intel.on("domains", (hits: string[]) => notify("Known malware site contacted", `This PC recently looked up ${hits.slice(0, 2).join(", ")}. Open Security to check.`, "security"));
+    space.on("progress", send13("space:progress"));
     void checkDriverChange().then((d) => d && notify("GPU driver updated", `Driver ${d} detected. Rigmind cleared the old shader caches, so expect a few hitches while games rebuild them.`));
 
     // Push live updates to the window.

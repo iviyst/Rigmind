@@ -221,7 +221,8 @@ $ins=$s.CreateUpdateInstaller(); $ins.Updates=$col; $res=$ins.Install()
 }
 
 /** Download the latest NVIDIA driver and launch its installer. */
-export async function installNvidia(progress: (m: string) => void): Promise<{ ok: boolean; message: string }> {
+/** Download the latest NVIDIA driver package (once). Returns its path and version. */
+export async function downloadNvidia(progress: (m: string) => void): Promise<{ ok: boolean; message: string; path?: string; version?: string }> {
   const nv = lastScan()?.nvidiaLatest ?? (await nvidiaLatest());
   if (!nv) return { ok: false, message: "Couldn't find the latest NVIDIA driver." };
   const dest = join(tmpdir(), `nvidia-${nv.version}.exe`);
@@ -248,7 +249,37 @@ export async function installNvidia(progress: (m: string) => void): Promise<{ ok
       return { ok: false, message: "Download failed: " + e.message };
     }
   }
+  return { ok: true, message: `NVIDIA ${nv.version} is downloaded.`, path: dest, version: nv.version };
+}
+
+export async function installNvidia(progress: (m: string) => void): Promise<{ ok: boolean; message: string }> {
+  const d = await downloadNvidia(progress);
+  if (!d.ok || !d.path) return d;
   progress("Starting the NVIDIA installer. Choose Express or Custom > Clean install.");
-  spawn(dest, [], { detached: true, stdio: "ignore" }).unref();
-  return { ok: true, message: `NVIDIA ${nv.version} installer is open. Close your games before installing.` };
+  spawn(d.path, [], { detached: true, stdio: "ignore" }).unref();
+  return { ok: true, message: `NVIDIA ${d.version} installer is open. Close your games before installing.` };
+}
+
+/**
+ * Unattended install for Ready to Play. Uses the package's own silent switches and keeps your
+ * NVIDIA settings (no clean install). Rigmind checks the new version with nvidia-smi afterwards.
+ */
+export async function installNvidiaSilent(progress: (m: string) => void): Promise<{ ok: boolean; message: string; version?: string }> {
+  const d = await downloadNvidia(progress);
+  if (!d.ok || !d.path) return d;
+  progress(`Installing NVIDIA ${d.version} silently...`);
+  const code = await new Promise<number | null>((resolve) => {
+    const p = spawn(d.path!, ["-s", "-noreboot", "-noeula"], { windowsHide: true });
+    const t = setTimeout(() => {
+      p.kill();
+      resolve(-1);
+    }, 25 * 60_000);
+    p.on("exit", (c) => {
+      clearTimeout(t);
+      resolve(c);
+    });
+    p.on("error", () => resolve(-2));
+  });
+  if (code !== 0 && code !== 1) return { ok: false, message: `The NVIDIA installer stopped with code ${code}.` };
+  return { ok: true, message: `NVIDIA ${d.version} installed.`, version: d.version };
 }

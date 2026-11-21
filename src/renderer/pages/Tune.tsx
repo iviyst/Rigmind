@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { DevPanel } from "../components/DevPanel";
 import { api, fmt } from "../api";
 import { Setting, Switch, toast } from "../components/Bits";
 import type { DisplayReport, EnergySummary, ExtrasSettings, NetStatus, ShaderCacheInfo } from "../../shared/types";
@@ -134,6 +135,7 @@ export function Tune() {
           <p className="muted small" style={{ marginBottom: 0 }}>To stop Steam or Epic updates during games, add their launchers to the pause list on the Game Boost page.</p>
         </section>
       </div>
+      <DevPanel />
     </div>
   );
 }

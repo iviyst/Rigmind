@@ -9,7 +9,8 @@
 //           {"cmd":"default","id":"<controlId>"}   hand one fan back to the BIOS/firmware
 //           {"cmd":"defaultAll"}
 //           {"cmd":"interval","ms":1000}
-//   More commands (ping, screenshots, screen color, displays, speech) are in Extras.cs.
+//   More commands (ping, screenshots, screen color, displays, speech) are in Extras.cs;
+//   night engine, hashing and disk map commands are in Night.cs.
 //
 // Safety: every software-controlled fan is returned to firmware control when stdin closes,
 // when the heartbeat stops for 5 seconds, or when the process exits for any reason.
@@ -220,7 +221,7 @@ internal static class Program
                 Write(Hello());
                 break;
             default:
-                Extras.Handle(name ?? "", cmd);
+                if (!Night.Handle(name ?? "", cmd)) Extras.Handle(name ?? "", cmd);
                 break;
         }
     }

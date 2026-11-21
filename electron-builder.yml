@@ -20,6 +20,8 @@ nsis:
   perMachine: true
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
+  # Adds the "What is this PC for?" page (Gaming / Work / Both).
+  include: build/installer.nsh
 # Auto-update: Rigmind checks GitHub Releases of this repo. Releases live at github.com/iviyst/Rigmind.
 publish:
   provider: github
