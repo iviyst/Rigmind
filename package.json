@@ -1,7 +1,7 @@
 {
   "name": "rigmind",
   "productName": "Rigmind",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "AI-powered monitoring, Game Boost and driver updates for a Windows gaming PC",
   "main": "dist-electron/main/main.js",
   "author": "Chris",
